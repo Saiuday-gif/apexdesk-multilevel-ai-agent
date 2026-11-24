@@ -17,6 +17,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'onetime'>('monthly');
 
   const [userName, setUserName] = useState('Saiuday Somidi');
   const [userEmail, setUserEmail] = useState('saiuday81618@gmail.com');
@@ -91,7 +92,6 @@ export default function App() {
         const data = JSON.parse(rawText);
         replyText = data.output || data.text || data.message || rawText;
       } catch {
-        // n8n నుండి Plain Text వస్తే నేరుగా దాన్నే చూపిస్తుంది
         replyText = rawText;
       }
 
@@ -211,7 +211,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
-        {/* Top Header with Profile Picture in Top-Right */}
+        {/* Top Header — Gemini Style Profile, Plan & Settings Gear */}
         <header className="h-16 border-b border-gray-800 bg-[#111827]/80 backdrop-blur px-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2.5">
@@ -224,25 +224,36 @@ export default function App() {
             <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
           </div>
 
-          {/* Top-Right Profile Section with Profile Picture */}
-          <div className="flex items-center gap-4">
+          {/* Top-Right Gemini Style Bar: Plan Pill + Settings Gear + Profile Pic & Name */}
+          <div className="flex items-center gap-3">
+            {/* Free / Pro Plan Selector Pill */}
             <button
               onClick={() => setIsPremiumModalOpen(true)}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
                 isPremium
-                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                  : 'bg-gray-800 text-gray-300 border-gray-700 hover:border-amber-500/50 hover:text-amber-300'
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'
+                  : 'bg-gray-800/80 text-gray-300 border-gray-700 hover:border-amber-500/50 hover:text-amber-300'
               }`}
+              title="Switch Plan"
             >
-              <Crown className="w-3.5 h-3.5 text-amber-400" />
-              <span>{isPremium ? 'Premium Active' : 'Go Pro'}</span>
+              <Crown className={`w-3.5 h-3.5 ${isPremium ? 'text-amber-400' : 'text-gray-400'}`} />
+              <span>{isPremium ? 'Pro Plan' : 'Free Plan'}</span>
             </button>
 
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsSettingsOpen(true)}>
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-white leading-none">{userName}</p>
-                <p className="text-xs text-gray-400 mt-1">{userEmail}</p>
-              </div>
+            {/* Settings Gear Icon */}
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition"
+              title="Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            {/* Profile Picture & Name */}
+            <div
+              className="flex items-center gap-2.5 cursor-pointer pl-2 border-l border-gray-800"
+              onClick={() => setIsSettingsOpen(true)}
+            >
               <div className="relative">
                 <img
                   src={profilePic}
@@ -254,6 +265,10 @@ export default function App() {
                     <Crown className="w-2 h-2 text-gray-950" />
                   </span>
                 )}
+              </div>
+              <div className="text-left hidden sm:block">
+                <p className="text-sm font-medium text-white leading-none">{userName}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{userEmail}</p>
               </div>
             </div>
           </div>
@@ -436,18 +451,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Premium Plan Modal */}
+      {/* Commercial Client Pricing & Premium Modal */}
       {isPremiumModalOpen && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111827] border border-amber-500/30 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-[#111827] border border-amber-500/30 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
             <div className="px-6 py-5 bg-gradient-to-r from-amber-500/15 to-orange-500/10 border-b border-gray-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
                   <Crown className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-white">ApexDesk AI Premium</h2>
-                  <p className="text-xs text-amber-300/80">Unlock full business automation</p>
+                  <h2 className="font-bold text-white">ApexDesk AI — Client Plans</h2>
+                  <p className="text-xs text-amber-300/80">Choose Monthly SaaS or Full App Ownership</p>
                 </div>
               </div>
               <button onClick={() => setIsPremiumModalOpen(false)} className="text-gray-400 hover:text-white">
@@ -455,10 +470,37 @@ export default function App() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="text-center py-2">
-                <span className="text-3xl font-extrabold text-white">₹499</span>
-                <span className="text-sm text-gray-400"> / month</span>
+            <div className="p-6 space-y-5">
+              {/* Plan Selection Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setSelectedPlan('monthly')}
+                  className={`p-4 rounded-xl border text-left transition ${
+                    selectedPlan === 'monthly'
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
+                  }`}
+                >
+                  <p className="text-xs font-semibold text-amber-400 uppercase">Monthly Plan</p>
+                  <p className="text-2xl font-extrabold text-white mt-1">₹999<span className="text-xs font-normal text-gray-400">/mo</span></p>
+                  <p className="text-[11px] text-gray-400 mt-1">Hosting + Maintenance</p>
+                </button>
+
+                <button
+                  onClick={() => setSelectedPlan('onetime')}
+                  className={`p-4 rounded-xl border text-left transition relative ${
+                    selectedPlan === 'onetime'
+                      ? 'border-amber-500 bg-amber-500/10'
+                      : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
+                  }`}
+                >
+                  <span className="absolute -top-2.5 right-3 px-2 py-0.5 text-[10px] font-bold bg-emerald-500 text-gray-950 rounded-full">
+                    FULL APP
+                  </span>
+                  <p className="text-xs font-semibold text-emerald-400 uppercase">Overall Setup</p>
+                  <p className="text-2xl font-extrabold text-white mt-1">₹14,999</p>
+                  <p className="text-[11px] text-gray-400 mt-1">One-Time Ownership</p>
+                </button>
               </div>
 
               <ul className="space-y-2.5 text-sm text-gray-300">
@@ -468,15 +510,15 @@ export default function App() {
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Automated Razorpay Payment Links & Order Sync</span>
+                  <span>Automated Razorpay Payment Links & Google Sheets Sync</span>
                 </li>
                 <li className="flex items-center gap-2.5">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Priority n8n Cloud Webhook Execution</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Custom Brand Logo & Pro Profile Badge</span>
+                  <span>
+                    {selectedPlan === 'onetime'
+                      ? 'Full Source Code + Custom Branding + n8n Workflow Setup'
+                      : 'Priority n8n Cloud Webhook Execution & Support'}
+                  </span>
                 </li>
               </ul>
 
@@ -487,7 +529,11 @@ export default function App() {
                 }}
                 className="w-full py-3 mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold text-sm rounded-xl shadow-lg transition"
               >
-                {isPremium ? 'Premium Plan Active' : 'Activate Premium Now'}
+                {isPremium
+                  ? 'Premium Plan Active'
+                  : selectedPlan === 'monthly'
+                  ? 'Activate Monthly Plan (₹999/mo)'
+                  : 'Get Full App Setup (₹14,999)'}
               </button>
             </div>
           </div>
