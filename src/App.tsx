@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Settings, User, Calendar, CheckCircle2, 
   Sparkles, Trash2, X, Bell, Shield, Link as LinkIcon, 
-  MessageSquare, FileSpreadsheet, Mail, Crown, Upload, Check, RefreshCw
+  MessageSquare, FileSpreadsheet, Mail, Crown, Upload, Check, RefreshCw, Database
 } from 'lucide-react';
 
 interface Message {
@@ -134,7 +134,7 @@ export default function App() {
   const handlePayment = () => {
     const amountInRupees = selectedPlan === 'monthly' ? 999 : 20000;
     const options = {
-      key: 'rzp_test_TK6LEdmOivjGoa',
+      key: 'rzp_live_U3yfAxu9vHRoKN',
       amount: amountInRupees * 100,
       currency: 'INR',
       name: 'ApexDesk AI',
@@ -200,35 +200,66 @@ export default function App() {
             </div>
           </div>
 
-          {/* Connected Tools (Now Clickable) */}
+          {/* Connected Tools (Fetch & Display Data) */}
           <div className="px-4 py-2">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Connected Tools
             </p>
             <div className="space-y-1 text-xs text-gray-300">
               <button
-                onClick={() => sendMessage('Show recent orders from Google Sheets')}
+                onClick={() =>
+                  sendMessage(
+                    'Get all rows from the ApexDesk AI Google Sheet (CRM, bookings, and inquiries).'
+                  )
+                }
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
+              >
+                <Database className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                <span>ApexDesk AI Sheet (CRM)</span>
+              </button>
+
+              <button
+                onClick={() =>
+                  sendMessage(
+                    'Fetch and list all orders from Google Sheets with Order ID, Customer Name, Item, Amount, and Payment Status.'
+                  )
+                }
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-green-400 shrink-0" />
                 <span>Google Sheets Orders</span>
               </button>
+
               <button
-                onClick={() => sendMessage('Check my upcoming schedule on Google Calendar')}
+                onClick={() =>
+                  sendMessage(
+                    'Fetch and list all upcoming and recently created or updated events from Google Calendar.'
+                  )
+                }
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
               >
                 <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 <span>Google Calendar</span>
               </button>
+
               <button
-                onClick={() => sendMessage('Check recent order confirmation emails in Gmail')}
+                onClick={() =>
+                  sendMessage(
+                    `Check and list the recent order confirmation emails sent to ${userEmail} in Gmail.`
+                  )
+                }
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
               >
                 <Mail className="w-3.5 h-3.5 text-red-400 shrink-0" />
                 <span>Gmail Alerts</span>
               </button>
+
               <button
-                onClick={() => sendMessage('Send a WhatsApp alert and generate a Razorpay payment link')}
+                onClick={() =>
+                  sendMessage(
+                    'Show a summary report of recent WhatsApp order alerts sent and Razorpay payment link statuses.'
+                  )
+                }
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
               >
                 <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -238,7 +269,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom Left: Gemini Style Profile + Plan + Settings Gear */}
+        {/* Bottom Left: Profile + Plan + Settings Gear */}
         <div className="p-3 border-t border-gray-800">
           <div className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-gray-800/60 transition">
             <div
