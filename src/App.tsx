@@ -1,573 +1,209 @@
 import { useState, useRef, useEffect } from 'react';
-import {
-  Sparkles,
-  Calendar,
-  FileSpreadsheet,
-  Mail,
-  MessageSquare,
-  Send,
-  CheckCircle2,
-  Clock,
-  Plus,
-  LogOut,
-  ShieldCheck,
-  ArrowRight,
-  RefreshCw,
-  Briefcase,
-  GraduationCap,
-  Building2,
-  UserCheck,
-  Eye,
-  EyeOff,
+import { 
+  Send, Settings, User, Calendar, CheckCircle2, 
+  Sparkles, Trash2, X, Bell, Shield, Link as LinkIcon, 
+  MessageSquare, FileSpreadsheet, Mail 
 } from 'lucide-react';
 
-const N8N_WEBHOOK_URL = '/n8n-chat/webhook/contact';
-const STORAGE_KEY = 'apexdesk_saved_records_v1';
-
-interface TaskRecord {
+interface Message {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
-  requirement: string;
-  dateTime: string;
-  status: 'Scheduled' | 'Booked' | 'Class Scheduled' | 'Completed';
-  category: 'Consultancy' | 'Hospitality' | 'Education' | 'General';
-}
-
-interface ChatMessage {
-  id: string;
-  sender: 'user' | 'ai';
+  sender: 'user' | 'agent';
   text: string;
   timestamp: string;
 }
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'dashboard'>('landing');
-  const [user, setUser] = useState<{ name: string; email: string; provider: string } | null>(null);
-  const [emailInput, setEmailInput] = useState('saiuday81618@gmail.com');
+  // Personalized Settings State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [userName, setUserName] = useState('Saiuday Somidi');
+  const [userEmail, setUserEmail] = useState('saiuday81618@gmail.com');
+  const [webhookUrl, setWebhookUrl] = useState('https://uday1997.app.n8n.cloud/webhook/contact');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [autoSyncSheets, setAutoSyncSheets] = useState(true);
 
-  const [tasks, setTasks] = useState<TaskRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? (JSON.parse(saved) as TaskRecord[]) : [];
-    } catch {
-      return [];
+  // Chat State
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      sender: 'agent',
+      text: `Welcome to ApexDesk AI! Connected to your Google Workspace (${userEmail}). Type a request below to book appointments, check schedules, place orders, or update Google Sheets, Calendar, Gmail & WhatsApp.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
-  });
-
-  const [showRecords, setShowRecords] = useState<boolean>(false);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-
-  const createWelcomeMessage = (): ChatMessage => ({
-    id: 'welcome-' + Date.now(),
-    sender: 'ai',
-    text: 'Welcome to ApexDesk AI! Connected to your Google Workspace (saiuday81618@gmail.com). Type a request below to book appointments, check schedules, or update Google Sheets, Calendar, Gmail & WhatsApp.',
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  });
-
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage()]);
+  ]);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState(
-    () => 'apex-' + Math.random().toString(36).substring(2, 10)
-  );
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    } catch {
-      // Storage quota fallback
-    }
-  }, [tasks]);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleWorkspaceRefresh = () => {
-    setIsRefreshing(true);
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      setTasks(saved ? (JSON.parse(saved) as TaskRecord[]) : []);
-    } catch {
-      setTasks([]);
-    }
-    setSessionId('apex-' + Math.random().toString(36).substring(2, 10));
-    setMessages([createWelcomeMessage()]);
-    setTimeout(() => setIsRefreshing(false), 350);
-  };
+  const sendMessage = async (textToSend?: string) => {
+    const messageText = textToSend || input;
+    if (!messageText.trim() || isLoading) return;
 
-  const handleSocialLogin = (provider: string, customEmail?: string) => {
-    const userEmail =
-      customEmail && customEmail.trim()
-        ? customEmail.trim()
-        : 'saiuday81618@gmail.com';
-    setUser({
-      name: 'Saiuday Somidi',
-      email: userEmail,
-      provider,
-    });
-    setView('dashboard');
-  };
-
-  const extractAndSaveRecord = (promptText: string) => {
-    const lower = promptText.toLowerCase();
-    const isBooking =
-      lower.includes('book') ||
-      lower.includes('schedule') ||
-      lower.includes('appointment') ||
-      lower.includes('add');
-
-    if (!isBooking) return;
-
-    const nameMatch = promptText.match(/Name:\s*([^,\n|]+)/i);
-    const reqMatch = promptText.match(/Requirement:\s*([^,\n|]+)/i);
-    const timeMatch = promptText.match(/Date\s*&?\s*Time:\s*([^,\n|]+)/i);
-    const emailMatch = promptText.match(/Email:\s*([^,\n|\s]+)/i);
-    const phoneMatch = promptText.match(/Phone:\s*([^,\n|\s]+)/i);
-
-    let category: TaskRecord['category'] = 'General';
-    if (lower.includes('consult')) category = 'Consultancy';
-    else if (lower.includes('hospitality') || lower.includes('room') || lower.includes('suite'))
-      category = 'Hospitality';
-    else if (lower.includes('class') || lower.includes('course') || lower.includes('student'))
-      category = 'Education';
-
-    const newRecord: TaskRecord = {
-      id: Date.now().toString(),
-      name: nameMatch ? nameMatch[1].trim() : 'Client Booking',
-      email: emailMatch ? emailMatch[1].trim() : 'saiuday81618@gmail.com',
-      phone: phoneMatch ? phoneMatch[1].trim() : '918555892883',
-      requirement: reqMatch
-        ? reqMatch[1].trim()
-        : promptText.length > 45
-        ? promptText.slice(0, 45) + '...'
-        : promptText,
-      dateTime: timeMatch ? timeMatch[1].trim() : 'Scheduled (IST)',
-      status: 'Scheduled',
-      category,
-    };
-
-    setTasks((prev) => [newRecord, ...prev]);
-    setShowRecords(true);
-  };
-
-  const extractReplyText = (payload: unknown): string => {
-    if (typeof payload === 'string') return payload;
-    if (Array.isArray(payload) && payload.length > 0) {
-      return extractReplyText(payload[0]);
-    }
-    if (payload && typeof payload === 'object') {
-      const obj = payload as Record<string, unknown>;
-      if (typeof obj.output === 'string' && obj.output.trim()) return obj.output;
-      if (typeof obj.text === 'string' && obj.text.trim()) return obj.text;
-      if (typeof obj.message === 'string' && obj.message.trim()) return obj.message;
-      if (typeof obj.response === 'string' && obj.response.trim()) return obj.response;
-      if (obj.json && typeof obj.json === 'object') {
-        return extractReplyText(obj.json);
-      }
-    }
-    return '';
-  };
-
-  const sendMessageToAgent = async (promptText: string) => {
-    const cleanPrompt = promptText.trim();
-    if (!cleanPrompt || loading) return;
-
-    const userMsg: ChatMessage = {
+    const userMsg: Message = {
       id: Date.now().toString(),
       sender: 'user',
-      text: cleanPrompt,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text: messageText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setLoading(true);
+    setMessages(prev => [...prev, userMsg]);
+    if (!textToSend) setInput('');
+    setIsLoading(true);
 
     try {
-      const response = await fetch(N8N_WEBHOOK_URL, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatInput: cleanPrompt,
-          sessionId,
-        }),
+          chatInput: messageText,
+          sessionId: userEmail,
+          user: { name: userName, email: userEmail }
+        })
       });
 
-      const rawText = await response.text();
-
       if (!response.ok) {
-        const cleanError = rawText.includes('<!DOCTYPE html>')
-          ? `Server returned ${response.status}. Verify Webhook node Respond is set to "Using 'Respond to Webhook' Node" and workflow is Published.`
-          : rawText || response.statusText;
-        throw new Error(cleanError);
+        throw new Error(`HTTP Error: ${response.status}`);
       }
 
-      let replyText = '';
-
+      const rawText = await response.text();
+      let replyText = rawText;
       try {
-        const parsed = JSON.parse(rawText);
-        replyText = extractReplyText(parsed) || rawText;
+        const data = JSON.parse(rawText);
+        replyText = data.output || data.text || data.message || rawText;
       } catch {
+        // n8n నుండి Plain Text వస్తే నేరుగా దాన్నే చూపిస్తుంది
         replyText = rawText;
       }
 
-      extractAndSaveRecord(cleanPrompt);
-
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          sender: 'ai',
-          text:
-            replyText.trim() ||
-            'Completed! Google Sheets, Calendar, Gmail & WhatsApp updated.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
+          sender: 'agent',
+          text: replyText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
       ]);
-    } catch (err) {
-      const errMessage =
-        err instanceof Error ? err.message : 'Unable to connect to n8n webhook.';
-      setMessages((prev) => [
+    } catch (error: any) {
+      setMessages(prev => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          sender: 'ai',
-          text: errMessage,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
+          sender: 'agent',
+          text: `Connection Error: ${error.message}. Please check your n8n Webhook URL in Settings.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
       ]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (view === 'landing') {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
-        <header className="max-w-7xl mx-auto w-full px-6 py-6 flex items-center justify-between border-b border-slate-800/80">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight">
-              ApexDesk <span className="text-indigo-400">AI</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setView('login')}
-              className="text-sm text-slate-300 hover:text-white transition cursor-pointer"
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('login')}
-              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold transition shadow-md shadow-indigo-600/20 cursor-pointer"
-            >
-              Launch App
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-5xl mx-auto px-6 py-20 text-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-medium mb-8">
-            <ShieldCheck className="w-4 h-4" /> Multi-Level Autonomous Operations Platform
-          </div>
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-tight mb-6 bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
-            Automate Bookings, CRM & Omnichannel Alerts in One Click
-          </h1>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto mb-10">
-            Connect natural language commands and interactive task workflows directly to Google
-            Sheets, Google Calendar, Gmail, and WhatsApp—zero manual follow-ups.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={() => setView('login')}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 font-semibold text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/25 transition cursor-pointer"
-            >
-              Launch ApexDesk AI <ArrowRight className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 text-left">
-            {[
-              {
-                icon: FileSpreadsheet,
-                title: 'Google Sheets CRM',
-                desc: 'Auto-log & update client rows',
-              },
-              { icon: Calendar, title: 'Smart Calendar', desc: 'Slot check & IST scheduling' },
-              { icon: Mail, title: 'Gmail Dispatches', desc: 'Branded instant confirmations' },
-              {
-                icon: MessageSquare,
-                title: 'WhatsApp Alerts',
-                desc: 'Real-time mobile summaries',
-              },
-            ].map((item, idx) => (
-              <div key={idx} className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-                <item.icon className="w-6 h-6 text-indigo-400 mb-3" />
-                <h3 className="font-semibold text-sm text-white">{item.title}</h3>
-                <p className="text-xs text-slate-400 mt-1">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </main>
-
-        <footer className="text-center py-6 text-xs text-slate-500 border-t border-slate-900">
-          ApexDesk AI • Enterprise Multi-Level Autonomous Agent Workspace
-        </footer>
-      </div>
-    );
-  }
-
-  if (view === 'login') {
-    return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-2xl font-bold">ApexDesk AI</span>
-          </div>
-          <h2 className="text-xl font-semibold text-center mb-2">Sign in to Workspace</h2>
-          <p className="text-slate-400 text-sm text-center mb-6">
-            Connected to <span className="text-indigo-300">saiuday81618@gmail.com</span>
-          </p>
-
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => handleSocialLogin('Google', 'saiuday81618@gmail.com')}
-              className="w-full py-3 px-4 rounded-xl bg-white text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 hover:bg-slate-100 transition cursor-pointer"
-            >
-              <span className="font-bold text-blue-600 text-base">G</span> Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocialLogin('LinkedIn', 'saiuday81618@gmail.com')}
-              className="w-full py-3 px-4 rounded-xl bg-[#0A66C2] text-white font-semibold text-sm flex items-center justify-center gap-3 hover:bg-[#004182] transition cursor-pointer"
-            >
-              <span className="font-bold text-base">in</span> Continue with LinkedIn
-            </button>
-          </div>
-
-          <div className="my-6 flex items-center gap-3">
-            <div className="h-px bg-slate-800 flex-1" />
-            <span className="text-xs text-slate-500">OR WORK EMAIL</span>
-            <div className="h-px bg-slate-800 flex-1" />
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSocialLogin('Email', emailInput);
-            }}
-            className="space-y-3"
-          >
-            <input
-              type="email"
-              required
-              placeholder="saiuday81618@gmail.com"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-sm focus:outline-none focus:border-indigo-500"
-            />
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm transition cursor-pointer"
-            >
-              Launch Workspace
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const clearChat = () => {
+    setMessages([
+      {
+        id: Date.now().toString(),
+        sender: 'agent',
+        text: 'Chat history cleared. How can I help you today?',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+    setIsSettingsOpen(false);
+  };
 
   return (
-    <div className="h-screen bg-slate-950 text-white flex overflow-hidden">
-      <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col justify-between hidden md:flex">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-400" />
-            <span className="font-bold text-base">ApexDesk AI</span>
+    <div className="flex h-screen bg-[#0B0F19] text-gray-100 font-sans">
+      {/* Left Sidebar */}
+      <aside className="w-64 bg-[#111827] border-r border-gray-800 flex flex-col justify-between">
+        <div>
+          {/* Brand Logo */}
+          <div className="p-4 border-b border-gray-800 flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-lg tracking-tight text-white">ApexDesk AI</span>
           </div>
-          <button
-            type="button"
-            onClick={handleWorkspaceRefresh}
-            title="Reset Chat & Refresh Workspace"
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
 
-        <div className="p-4 border-b border-slate-800 space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            One-Click Workflows
-          </p>
-          <button
-            type="button"
-            onClick={() =>
-              sendMessageToAgent(
-                'Check November 30, 2026 (IST) in Google Calendar (Get many events) and Google Sheets (Get row(s) in sheet). List all scheduled meetings, consultancy bookings, and class schedules concisely. Do not create or edit anything.'
-              )
-            }
-            className="w-full text-left px-3 py-2.5 rounded-xl bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 text-xs font-medium text-indigo-200 flex items-center gap-2 transition cursor-pointer"
-          >
-            <Calendar className="w-4 h-4 text-indigo-400 shrink-0" /> Check Nov 30 Schedules
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              sendMessageToAgent(
-                'Book a new Business Consultancy appointment. Name: Kiran Rao, Email: saiuday81618@gmail.com, Phone: 918555892883, Requirement: Business Consultancy, Date & Time: November 30, 2026 at 11:00 AM IST (30 mins), Status: Scheduled. Run Get many events, Create an event, Append row in sheet, Send Gmail, and summarize for WhatsApp.'
-              )
-            }
-            className="w-full text-left px-3 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-2 transition cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-emerald-400 shrink-0" /> Quick Book Consultancy
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Saved Records ({tasks.length})
+          {/* Quick Workflows */}
+          <div className="p-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              Quick Workflows
             </p>
-            <div className="flex items-center gap-1.5">
+            <div className="space-y-2">
               <button
-                type="button"
-                onClick={() => setShowRecords((prev) => !prev)}
-                title={showRecords ? 'Hide Records' : 'View Saved Records'}
-                className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 flex items-center gap-1 transition cursor-pointer"
+                onClick={() => sendMessage('Check Nov 30 Schedule')}
+                className="w-full text-left px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-sm text-gray-200 flex items-center gap-2 transition"
               >
-                {showRecords ? (
-                  <>
-                    <EyeOff className="w-3 h-3 text-amber-400" /> Hide
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3 h-3 text-indigo-400" /> View
-                  </>
-                )}
+                <Calendar className="w-4 h-4 text-blue-400" />
+                Check Nov 30 Schedule
               </button>
               <button
-                type="button"
-                onClick={handleWorkspaceRefresh}
-                title="Refresh Saved Records"
-                className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                onClick={() => sendMessage('I want to place an order for Web Design, 500 rupees')}
+                className="w-full text-left px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-sm text-gray-200 flex items-center gap-2 transition"
               >
-                <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                Quick Order & Pay
               </button>
             </div>
           </div>
 
-          {!showRecords ? (
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-center">
-              <p className="text-xs text-slate-400">
-                Records are safely saved ({tasks.length}).
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Click <span className="text-indigo-400 font-medium">View</span> above or add a new
-                booking to display them.
-              </p>
+          {/* Saved Records */}
+          <div className="px-4 py-2">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Connected Tools
+            </p>
+            <div className="space-y-1.5 text-xs text-gray-400">
+              <div className="flex items-center gap-2 px-2 py-1"><FileSpreadsheet className="w-3.5 h-3.5 text-green-400" /> Google Sheets Orders</div>
+              <div className="flex items-center gap-2 px-2 py-1"><Calendar className="w-3.5 h-3.5 text-blue-400" /> Google Calendar</div>
+              <div className="flex items-center gap-2 px-2 py-1"><Mail className="w-3.5 h-3.5 text-red-400" /> Gmail Alerts</div>
+              <div className="flex items-center gap-2 px-2 py-1"><MessageSquare className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp & Razorpay</div>
             </div>
-          ) : tasks.length === 0 ? (
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-              <p className="text-xs text-slate-400">No records added in this session yet.</p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Book an appointment below to save and view it here.
-              </p>
-            </div>
-          ) : (
-            tasks.map((task) => (
-              <div
-                key={task.id}
-                onClick={() =>
-                  sendMessageToAgent(
-                    `Check status and details for ${task.name} (${task.requirement} on ${task.dateTime}) in Google Sheets and Google Calendar, and confirm if all notifications are sent.`
-                  )
-                }
-                className="p-3.5 rounded-xl bg-slate-950/90 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-500/50 transition cursor-pointer group"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-semibold text-white group-hover:text-indigo-300 flex items-center gap-1.5">
-                    {task.category === 'Consultancy' && (
-                      <Briefcase className="w-3.5 h-3.5 text-indigo-400" />
-                    )}
-                    {task.category === 'Hospitality' && (
-                      <Building2 className="w-3.5 h-3.5 text-amber-400" />
-                    )}
-                    {task.category === 'Education' && (
-                      <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
-                    )}
-                    {task.name}
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                    {task.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 line-clamp-1">{task.requirement}</p>
-                <p className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> {task.dateTime}
-                </p>
-              </div>
-            ))
-          )}
+          </div>
         </div>
 
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold shrink-0">
-              {user?.name?.[0] || 'S'}
-            </div>
-            <div className="truncate">
-              <p className="text-xs font-semibold truncate">{user?.name}</p>
-              <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
-            </div>
-          </div>
+        {/* Bottom Left: Settings Button */}
+        <div className="p-3 border-t border-gray-800">
           <button
-            type="button"
-            onClick={() => setView('landing')}
-            title="Sign Out"
-            className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gray-800/50 hover:bg-gray-800 text-gray-200 transition text-sm font-medium"
           >
-            <LogOut className="w-4 h-4" />
+            <Settings className="w-4 h-4 text-gray-400" />
+            <span>Settings & Preferences</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col bg-slate-950">
-        <header className="h-16 px-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col">
+        {/* Top Header with Profile in Top-Right */}
+        <header className="h-16 border-b border-gray-800 bg-[#111827]/80 backdrop-blur px-6 flex items-center justify-between">
           <div>
-            <h1 className="text-sm font-semibold flex items-center gap-2">
-              Autonomous Multi-Level Agent
-              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                <CheckCircle2 className="w-3 h-3" /> Live n8n Connected
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-semibold text-white">Autonomous Multi-Level Agent</h1>
+              <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live n8n Connected
               </span>
-            </h1>
-            <p className="text-xs text-slate-400">
-              Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync
-            </p>
+            </div>
+            <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <UserCheck className="w-4 h-4 text-indigo-400" />
-            <span className="hidden sm:inline">{user?.email}</span>
+
+          {/* Top-Right Profile Section */}
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-medium text-white leading-none">{userName}</p>
+              <p className="text-xs text-gray-400 mt-1">{userEmail}</p>
+            </div>
+            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-semibold shadow-md border border-blue-400/30">
+              {userName.charAt(0).toUpperCase()}
+            </div>
           </div>
         </header>
 
+        {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.map((msg) => (
             <div
@@ -575,59 +211,152 @@ export default function App() {
               className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-2xl rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap leading-relaxed ${
+                className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-indigo-600 text-white rounded-br-none'
-                    : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none'
+                    ? 'bg-blue-600 text-white rounded-br-none'
+                    : 'bg-[#1F2937] text-gray-100 border border-gray-700/60 rounded-bl-none'
                 }`}
               >
-                {msg.text}
-                <div
-                  className={`text-[10px] mt-1.5 ${
-                    msg.sender === 'user' ? 'text-indigo-200 text-right' : 'text-slate-500'
-                  }`}
-                >
+                <p className="whitespace-pre-wrap">{msg.text}</p>
+                <span className="block text-[10px] opacity-60 mt-1.5 text-right">
                   {msg.timestamp}
-                </div>
+                </span>
               </div>
             </div>
           ))}
-          {loading && (
+          {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 text-xs text-indigo-300 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 animate-spin" /> Executing Sheets, Calendar, Gmail &
-                WhatsApp tools...
+              <div className="bg-[#1F2937] border border-gray-700/60 rounded-2xl rounded-bl-none px-4 py-3 text-sm text-gray-400">
+                Agent is thinking & executing tools...
               </div>
             </div>
           )}
-          <div ref={chatEndRef} />
+          <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-900/40">
+        {/* Input Box */}
+        <div className="p-4 border-t border-gray-800 bg-[#111827]/60">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              sendMessageToAgent(input);
+              sendMessage();
             }}
-            className="max-w-4xl mx-auto flex items-center gap-3"
+            className="max-w-4xl mx-auto flex gap-3"
           >
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a booking, schedule check, update, or cancellation (e.g., Book a meeting tomorrow at 4 PM)..."
-              className="flex-1 px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+              placeholder="Type a booking, order, schedule check, or payment request..."
+              className="flex-1 bg-[#1F2937] border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
             />
             <button
               type="submit"
-              disabled={loading || !input.trim()}
-              className="px-5 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 font-semibold text-sm flex items-center gap-2 transition cursor-pointer"
+              disabled={isLoading || !input.trim()}
+              className="px-5 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-medium text-sm flex items-center gap-2 transition"
             >
-              Send <Send className="w-4 h-4" />
+              <span>Send</span>
+              <Send className="w-4 h-4" />
             </button>
           </form>
         </div>
       </main>
+
+      {/* Personalized Settings Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-400" />
+                <h2 className="font-semibold text-white">Personalized Settings</h2>
+              </div>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-sm">
+              <div>
+                <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" /> Display Name
+                </label>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  className="w-full bg-[#1F2937] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5" /> Workspace Email
+                </label>
+                <input
+                  type="email"
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  className="w-full bg-[#1F2937] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
+                  <LinkIcon className="w-3.5 h-3.5" /> n8n Production Webhook URL
+                </label>
+                <input
+                  type="text"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  className="w-full bg-[#1F2937] border border-gray-700 rounded-lg px-3 py-2 text-xs text-blue-300 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="pt-2 space-y-3 border-t border-gray-800">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="flex items-center gap-2 text-gray-300">
+                    <Bell className="w-4 h-4 text-gray-400" /> WhatsApp & Email Alerts
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={notificationsEnabled}
+                    onChange={(e) => setNotificationsEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="flex items-center gap-2 text-gray-300">
+                    <Shield className="w-4 h-4 text-gray-400" /> Auto-Sync Orders to Sheets
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={autoSyncSheets}
+                    onChange={(e) => setAutoSyncSheets(e.target.checked)}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-800 flex items-center justify-between">
+              <button
+                onClick={clearChat}
+                className="px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-1.5 transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear Chat
+              </button>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition"
+              >
+                Save & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
