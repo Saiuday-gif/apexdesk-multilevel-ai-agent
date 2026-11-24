@@ -234,52 +234,6 @@ export default function App() {
             </div>
             <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
           </div>
-
-          {/* Top-Right Profile Section */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsPremiumModalOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
-                isPremium
-                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'
-                  : 'bg-gray-800/80 text-gray-300 border-gray-700 hover:border-amber-500/50 hover:text-amber-300'
-              }`}
-              title="Switch Plan"
-            >
-              <Crown className={`w-3.5 h-3.5 ${isPremium ? 'text-amber-400' : 'text-gray-400'}`} />
-              <span>{isPremium ? 'Pro Plan' : 'Free Plan'}</span>
-            </button>
-
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition"
-              title="Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-
-            <div
-              className="flex items-center gap-2.5 cursor-pointer pl-2 border-l border-gray-800"
-              onClick={() => setIsSettingsOpen(true)}
-            >
-              <div className="relative">
-                <img
-                  src={profilePic}
-                  alt={userName}
-                  className="w-9 h-9 rounded-full object-cover border-2 border-blue-500/50 shadow-md"
-                />
-                {isPremium && (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full flex items-center justify-center border border-[#111827]">
-                    <Crown className="w-2 h-2 text-gray-950" />
-                  </span>
-                )}
-              </div>
-              <div className="text-left hidden sm:block">
-                <p className="text-sm font-medium text-white leading-none">{userName}</p>
-                <p className="text-[11px] text-gray-400 mt-1">{userEmail}</p>
-              </div>
-            </div>
-          </div>
         </header>
 
         {/* Chat Messages */}
