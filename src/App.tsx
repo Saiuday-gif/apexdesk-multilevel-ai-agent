@@ -131,6 +131,32 @@ export default function App() {
     setIsSettingsOpen(false);
   };
 
+  const handlePayment = () => {
+    const amountInRupees = selectedPlan === 'monthly' ? 999 : 20000;
+    const options = {
+      key: 'rzp_test_TK6LEdmOivjGoa',
+      amount: amountInRupees * 100,
+      currency: 'INR',
+      name: 'ApexDesk AI',
+      description: selectedPlan === 'monthly' ? 'Monthly SaaS Plan' : 'Full App Ownership Setup',
+      handler: function (response: any) {
+        alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}`);
+        setIsPremium(true);
+        setIsPremiumModalOpen(false);
+      },
+      prefill: {
+        name: userName,
+        email: userEmail,
+      },
+      theme: {
+        color: '#f59e0b',
+      },
+    };
+
+    const rzp = new (window as any).Razorpay(options);
+    rzp.open();
+  };
+
   return (
     <div className="flex h-screen bg-[#0B0F19] text-gray-100 font-sans">
       {/* Left Sidebar */}
@@ -485,17 +511,14 @@ export default function App() {
               </ul>
 
               <button
-                onClick={() => {
-                  setIsPremium(true);
-                  setIsPremiumModalOpen(false);
-                }}
+                onClick={isPremium ? undefined : handlePayment}
                 className="w-full py-3 mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold text-sm rounded-xl shadow-lg transition"
               >
                 {isPremium
                   ? 'Premium Plan Active'
                   : selectedPlan === 'monthly'
-                  ? 'Activate Monthly Plan (₹999/mo)'
-                  : 'Get Full App Setup (₹20,000)'}
+                  ? 'Pay ₹999/mo via Razorpay'
+                  : 'Pay ₹20,000 via Razorpay'}
               </button>
             </div>
           </div>
