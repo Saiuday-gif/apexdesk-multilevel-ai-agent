@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Settings, User, Calendar, CheckCircle2, 
   Sparkles, Trash2, X, Bell, Shield, Link as LinkIcon, 
-  MessageSquare, FileSpreadsheet, Mail, Crown, Upload, Check
+  MessageSquare, FileSpreadsheet, Mail, Crown, Upload, Check, RefreshCw
 } from 'lucide-react';
 
 interface Message {
@@ -124,7 +124,7 @@ export default function App() {
       {
         id: Date.now().toString(),
         sender: 'agent',
-        text: 'Chat history cleared. How can I help you today?',
+        text: 'Chat refreshed! How can I help you today?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
@@ -200,16 +200,40 @@ export default function App() {
             </div>
           </div>
 
-          {/* Saved Records */}
+          {/* Connected Tools (Now Clickable) */}
           <div className="px-4 py-2">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Connected Tools
             </p>
-            <div className="space-y-1.5 text-xs text-gray-400">
-              <div className="flex items-center gap-2 px-2 py-1"><FileSpreadsheet className="w-3.5 h-3.5 text-green-400" /> Google Sheets Orders</div>
-              <div className="flex items-center gap-2 px-2 py-1"><Calendar className="w-3.5 h-3.5 text-blue-400" /> Google Calendar</div>
-              <div className="flex items-center gap-2 px-2 py-1"><Mail className="w-3.5 h-3.5 text-red-400" /> Gmail Alerts</div>
-              <div className="flex items-center gap-2 px-2 py-1"><MessageSquare className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp & Razorpay</div>
+            <div className="space-y-1 text-xs text-gray-300">
+              <button
+                onClick={() => sendMessage('Show recent orders from Google Sheets')}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                <span>Google Sheets Orders</span>
+              </button>
+              <button
+                onClick={() => sendMessage('Check my upcoming schedule on Google Calendar')}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
+              >
+                <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>Google Calendar</span>
+              </button>
+              <button
+                onClick={() => sendMessage('Check recent order confirmation emails in Gmail')}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
+              >
+                <Mail className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span>Gmail Alerts</span>
+              </button>
+              <button
+                onClick={() => sendMessage('Send a WhatsApp alert and generate a Razorpay payment link')}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>WhatsApp & Razorpay</span>
+              </button>
             </div>
           </div>
         </div>
@@ -260,6 +284,16 @@ export default function App() {
             </div>
             <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
           </div>
+
+          {/* Refresh Chat Button */}
+          <button
+            onClick={clearChat}
+            className="px-3 py-1.5 rounded-lg bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 border border-gray-700 transition"
+            title="Refresh Chat"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
+          </button>
         </header>
 
         {/* Chat Messages */}
