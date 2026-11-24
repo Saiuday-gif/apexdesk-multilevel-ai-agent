@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Settings, User, Calendar, CheckCircle2, 
   Sparkles, Trash2, X, Bell, Shield, Link as LinkIcon, 
@@ -188,30 +188,41 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom Left: Premium & Settings */}
-        <div className="p-3 border-t border-gray-800 space-y-2">
-          {!isPremium && (
-            <button
+        {/* Bottom Left: Gemini Style Profile + Plan + Settings Gear */}
+        <div className="p-3 border-t border-gray-800">
+          <div className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-gray-800/60 transition">
+            <div
+              className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
               onClick={() => setIsPremiumModalOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-semibold text-xs shadow-lg transition"
+              title="Manage Plan & Profile"
             >
-              <Crown className="w-4 h-4" />
-              <span>Upgrade to Premium</span>
+              <img
+                src={profilePic}
+                alt={userName}
+                className="w-9 h-9 rounded-full object-cover border border-gray-700 shrink-0"
+              />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white truncate leading-tight">{userName}</p>
+                <p className={`text-xs mt-0.5 font-medium ${isPremium ? 'text-amber-400' : 'text-gray-400'}`}>
+                  {isPremium ? 'Pro' : 'Free'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-700/60 transition shrink-0"
+              title="Settings & Preferences"
+            >
+              <Settings className="w-4 h-4" />
             </button>
-          )}
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gray-800/50 hover:bg-gray-800 text-gray-200 transition text-sm font-medium"
-          >
-            <Settings className="w-4 h-4 text-gray-400" />
-            <span>Settings & Preferences</span>
-          </button>
+          </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
-        {/* Top Header — Gemini Style Profile, Plan & Settings Gear */}
+        {/* Top Header */}
         <header className="h-16 border-b border-gray-800 bg-[#111827]/80 backdrop-blur px-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2.5">
@@ -224,9 +235,8 @@ export default function App() {
             <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
           </div>
 
-          {/* Top-Right Gemini Style Bar: Plan Pill + Settings Gear + Profile Pic & Name */}
+          {/* Top-Right Profile Section */}
           <div className="flex items-center gap-3">
-            {/* Free / Pro Plan Selector Pill */}
             <button
               onClick={() => setIsPremiumModalOpen(true)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
@@ -240,7 +250,6 @@ export default function App() {
               <span>{isPremium ? 'Pro Plan' : 'Free Plan'}</span>
             </button>
 
-            {/* Settings Gear Icon */}
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition"
@@ -249,7 +258,6 @@ export default function App() {
               <Settings className="w-5 h-5" />
             </button>
 
-            {/* Profile Picture & Name */}
             <div
               className="flex items-center gap-2.5 cursor-pointer pl-2 border-l border-gray-800"
               onClick={() => setIsSettingsOpen(true)}
@@ -498,7 +506,7 @@ export default function App() {
                     FULL APP
                   </span>
                   <p className="text-xs font-semibold text-emerald-400 uppercase">Overall Setup</p>
-                  <p className="text-2xl font-extrabold text-white mt-1">₹14,999</p>
+                  <p className="text-2xl font-extrabold text-white mt-1">₹20,000</p>
                   <p className="text-[11px] text-gray-400 mt-1">One-Time Ownership</p>
                 </button>
               </div>
@@ -533,7 +541,7 @@ export default function App() {
                   ? 'Premium Plan Active'
                   : selectedPlan === 'monthly'
                   ? 'Activate Monthly Plan (₹999/mo)'
-                  : 'Get Full App Setup (₹14,999)'}
+                  : 'Get Full App Setup (₹20,000)'}
               </button>
             </div>
           </div>
