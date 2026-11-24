@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   Send, Settings, User, Calendar, CheckCircle2, 
   Sparkles, Trash2, X, Bell, Shield, Link as LinkIcon, 
-  MessageSquare, FileSpreadsheet, Mail 
+  MessageSquare, FileSpreadsheet, Mail, Crown, Upload, Check
 } from 'lucide-react';
 
 interface Message {
@@ -15,8 +15,14 @@ interface Message {
 export default function App() {
   // Personalized Settings State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+
   const [userName, setUserName] = useState('Saiuday Somidi');
   const [userEmail, setUserEmail] = useState('saiuday81618@gmail.com');
+  const [profilePic, setProfilePic] = useState(
+    'https://ui-avatars.com/api/?name=Saiuday+Somidi&background=2563eb&color=fff&size=128'
+  );
   const [webhookUrl, setWebhookUrl] = useState('https://uday1997.app.n8n.cloud/webhook/contact');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSyncSheets, setAutoSyncSheets] = useState(true);
@@ -37,6 +43,17 @@ export default function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleProfilePicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePic(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const sendMessage = async (textToSend?: string) => {
     const messageText = textToSend || input;
@@ -120,11 +137,18 @@ export default function App() {
       <aside className="w-64 bg-[#111827] border-r border-gray-800 flex flex-col justify-between">
         <div>
           {/* Brand Logo */}
-          <div className="p-4 border-b border-gray-800 flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-bold text-lg tracking-tight text-white">ApexDesk AI</span>
             </div>
-            <span className="font-bold text-lg tracking-tight text-white">ApexDesk AI</span>
+            {isPremium && (
+              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                PRO
+              </span>
+            )}
           </div>
 
           {/* Quick Workflows */}
@@ -164,8 +188,17 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom Left: Settings Button */}
-        <div className="p-3 border-t border-gray-800">
+        {/* Bottom Left: Premium & Settings */}
+        <div className="p-3 border-t border-gray-800 space-y-2">
+          {!isPremium && (
+            <button
+              onClick={() => setIsPremiumModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-semibold text-xs shadow-lg transition"
+            >
+              <Crown className="w-4 h-4" />
+              <span>Upgrade to Premium</span>
+            </button>
+          )}
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gray-800/50 hover:bg-gray-800 text-gray-200 transition text-sm font-medium"
@@ -178,7 +211,7 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col">
-        {/* Top Header with Profile in Top-Right */}
+        {/* Top Header with Profile Picture in Top-Right */}
         <header className="h-16 border-b border-gray-800 bg-[#111827]/80 backdrop-blur px-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2.5">
@@ -191,14 +224,37 @@ export default function App() {
             <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
           </div>
 
-          {/* Top-Right Profile Section */}
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-white leading-none">{userName}</p>
-              <p className="text-xs text-gray-400 mt-1">{userEmail}</p>
-            </div>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-semibold shadow-md border border-blue-400/30">
-              {userName.charAt(0).toUpperCase()}
+          {/* Top-Right Profile Section with Profile Picture */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsPremiumModalOpen(true)}
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                isPremium
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : 'bg-gray-800 text-gray-300 border-gray-700 hover:border-amber-500/50 hover:text-amber-300'
+              }`}
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>{isPremium ? 'Premium Active' : 'Go Pro'}</span>
+            </button>
+
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsSettingsOpen(true)}>
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-white leading-none">{userName}</p>
+                <p className="text-xs text-gray-400 mt-1">{userEmail}</p>
+              </div>
+              <div className="relative">
+                <img
+                  src={profilePic}
+                  alt={userName}
+                  className="w-9 h-9 rounded-full object-cover border-2 border-blue-500/50 shadow-md"
+                />
+                {isPremium && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-amber-500 rounded-full flex items-center justify-center border border-[#111827]">
+                    <Crown className="w-2 h-2 text-gray-950" />
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -276,7 +332,29 @@ export default function App() {
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-sm">
+            <div className="p-6 space-y-4 text-sm max-h-[75vh] overflow-y-auto">
+              {/* Profile Picture Upload */}
+              <div className="flex items-center gap-4 pb-2 border-b border-gray-800">
+                <img
+                  src={profilePic}
+                  alt="Preview"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-blue-500"
+                />
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-400 mb-1.5">Profile Picture</label>
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs text-white rounded-lg cursor-pointer transition">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleProfilePicUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" /> Display Name
@@ -352,6 +430,64 @@ export default function App() {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition"
               >
                 Save & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Plan Modal */}
+      {isPremiumModalOpen && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#111827] border border-amber-500/30 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="px-6 py-5 bg-gradient-to-r from-amber-500/15 to-orange-500/10 border-b border-gray-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
+                  <Crown className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-white">ApexDesk AI Premium</h2>
+                  <p className="text-xs text-amber-300/80">Unlock full business automation</p>
+                </div>
+              </div>
+              <button onClick={() => setIsPremiumModalOpen(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="text-center py-2">
+                <span className="text-3xl font-extrabold text-white">₹499</span>
+                <span className="text-sm text-gray-400"> / month</span>
+              </div>
+
+              <ul className="space-y-2.5 text-sm text-gray-300">
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Unlimited WhatsApp & Web AI Agent Messages</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Automated Razorpay Payment Links & Order Sync</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Priority n8n Cloud Webhook Execution</span>
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Custom Brand Logo & Pro Profile Badge</span>
+                </li>
+              </ul>
+
+              <button
+                onClick={() => {
+                  setIsPremium(true);
+                  setIsPremiumModalOpen(false);
+                }}
+                className="w-full py-3 mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold text-sm rounded-xl shadow-lg transition"
+              >
+                {isPremium ? 'Premium Plan Active' : 'Activate Premium Now'}
               </button>
             </div>
           </div>
