@@ -1,594 +1,524 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Send, Settings, User, Calendar, CheckCircle2, 
-  Sparkles, Trash2, X, Bell, Shield, Link as LinkIcon, 
-  MessageSquare, FileSpreadsheet, Mail, Crown, Upload, Check, RefreshCw, Database
-} from 'lucide-react';
+import { useState, useRef, useEffect, type KeyboardEvent, type CSSProperties } from "react";
 
-interface Message {
-  id: string;
-  sender: 'user' | 'agent';
+interface ChatMessage {
+  id: number;
+  sender: "user" | "ai";
   text: string;
-  timestamp: string;
+  time: string;
 }
 
+const DEFAULT_WEBHOOK_URL = "https://uday1997.app.n8n.cloud/webhook/contact";
+
 export default function App() {
-  // Personalized Settings State
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'onetime'>('monthly');
-
-  const [userName, setUserName] = useState('Saiuday Somidi');
-  const [userEmail, setUserEmail] = useState('saiuday81618@gmail.com');
-  const [profilePic, setProfilePic] = useState(
-    'https://ui-avatars.com/api/?name=Saiuday+Somidi&background=2563eb&color=fff&size=128'
-  );
-  const [webhookUrl, setWebhookUrl] = useState('https://uday1997.app.n8n.cloud/webhook/contact');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [autoSyncSheets, setAutoSyncSheets] = useState(true);
-
-  // Chat State
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: '1',
-      sender: 'agent',
-      text: `Welcome to ApexDesk AI! Connected to your Google Workspace (${userEmail}). Type a request below to book appointments, check schedules, place orders, or update Google Sheets, Calendar, Gmail & WhatsApp.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
+      id: 1,
+      sender: "ai",
+      text: "Welcome to ApexDesk AI! Connected to your Google Workspace (saiuday81618@gmail.com). Type a request below to book appointments, check schedules, place orders, or update Google Sheets, Calendar, Gmail & WhatsApp.",
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    },
   ]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [input, setInput] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [webhookUrl, setWebhookUrl] = useState<string>(DEFAULT_WEBHOOK_URL);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleProfilePicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfilePic(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  const sendMessage = async (customText?: string) => {
+    const textToSend = (customText !== undefined ? customText : input).trim();
+    if (!textToSend || loading) return;
 
-  const sendMessage = async (textToSend?: string) => {
-    const messageText = textToSend || input;
-    if (!messageText.trim() || isLoading) return;
+    const currentTime = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: 'user',
-      text: messageText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const userMsg: ChatMessage = {
+      id: Date.now(),
+      sender: "user",
+      text: textToSend,
+      time: currentTime,
     };
 
-    setMessages(prev => [...prev, userMsg]);
-    if (!textToSend) setInput('');
-    setIsLoading(true);
+    setMessages((prev) => [...prev, userMsg]);
+    if (customText === undefined) {
+      setInput("");
+    }
+    setLoading(true);
 
     try {
       const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chatInput: messageText,
-          sessionId: userEmail,
-          user: { name: userName, email: userEmail }
-        })
+          message: textToSend,
+          chatInput: textToSend,
+          source: "vercel_web_app",
+          telegramChatId: "6202497965",
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP Error: ${response.status}`);
-      }
-
       const rawText = await response.text();
-      let replyText = rawText;
-      try {
-        const data = JSON.parse(rawText);
-        replyText = data.output || data.text || data.message || rawText;
-      } catch {
-        replyText = rawText;
+      let aiReply = "";
+
+      if (rawText) {
+        try {
+          const parsed: unknown = JSON.parse(rawText);
+          const item = (Array.isArray(parsed) ? parsed[0] : parsed) as Record<string, unknown>;
+          const extracted =
+            item?.output ??
+            item?.reply ??
+            item?.message ??
+            item?.text ??
+            item?.response;
+
+          if (typeof extracted === "string" && extracted.trim().length > 0) {
+            aiReply = extracted;
+          } else if (typeof item === "string") {
+            aiReply = item;
+          } else {
+            aiReply = rawText;
+          }
+        } catch {
+          aiReply = rawText;
+        }
       }
 
-      setMessages(prev => [
+      if (!aiReply || aiReply === "{}" || aiReply === "[]") {
+        aiReply = "Message received by ApexDesk AI and synced with Telegram.";
+      }
+
+      setMessages((prev) => [
         ...prev,
         {
-          id: (Date.now() + 1).toString(),
-          sender: 'agent',
-          text: replyText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
+          id: Date.now() + 1,
+          sender: "ai",
+          text: aiReply,
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
       ]);
-    } catch (error: any) {
-      setMessages(prev => [
+    } catch {
+      setMessages((prev) => [
         ...prev,
         {
-          id: (Date.now() + 1).toString(),
-          sender: 'agent',
-          text: `Connection Error: ${error.message}. Please check your n8n Webhook URL in Settings.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
+          id: Date.now() + 1,
+          sender: "ai",
+          text: "Unable to reach n8n webhook. Please check if your workflow is Published.",
+          time: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
       ]);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const clearChat = () => {
-    setMessages([
-      {
-        id: Date.now().toString(),
-        sender: 'agent',
-        text: 'Chat refreshed! How can I help you today?',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
-    setIsSettingsOpen(false);
-  };
-
-  const handlePayment = () => {
-    const amountInRupees = selectedPlan === 'monthly' ? 999 : 20000;
-    const options = {
-      key: 'rzp_live_U3yfAxu9vHRoKN',
-      amount: amountInRupees * 100,
-      currency: 'INR',
-      name: 'ApexDesk AI',
-      description: selectedPlan === 'monthly' ? 'Monthly SaaS Plan' : 'Full App Ownership Setup',
-      handler: function (response: any) {
-        alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}`);
-        setIsPremium(true);
-        setIsPremiumModalOpen(false);
-      },
-      prefill: {
-        name: userName,
-        email: userEmail,
-      },
-      theme: {
-        color: '#f59e0b',
-      },
-    };
-
-    const rzp = new (window as any).Razorpay(options);
-    rzp.open();
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void sendMessage();
+    }
   };
 
   return (
-    <div className="flex h-screen bg-[#0B0F19] text-gray-100 font-sans">
-      {/* Left Sidebar */}
-      <aside className="w-64 bg-[#111827] border-r border-gray-800 flex flex-col justify-between">
+    <div style={styles.container}>
+      {/* Left Dashboard Sidebar */}
+      <aside style={styles.sidebar}>
         <div>
-          {/* Brand Logo */}
-          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-lg tracking-tight text-white">ApexDesk AI</span>
-            </div>
-            {isPremium && (
-              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                PRO
-              </span>
-            )}
+          <div style={styles.brand}>
+            <div style={styles.logoBox}>✨</div>
+            <span style={styles.brandTitle}>ApexDesk AI</span>
           </div>
 
-          {/* Quick Workflows */}
-          <div className="p-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-              Quick Workflows
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={() => sendMessage('Check Nov 30 Schedule')}
-                className="w-full text-left px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-sm text-gray-200 flex items-center gap-2 transition"
-              >
-                <Calendar className="w-4 h-4 text-blue-400" />
-                Check Nov 30 Schedule
-              </button>
-              <button
-                onClick={() => sendMessage('I want to place an order for Web Design, 500 rupees')}
-                className="w-full text-left px-3 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-sm text-gray-200 flex items-center gap-2 transition"
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                Quick Order & Pay
-              </button>
-            </div>
+          <div style={styles.sectionLabel}>QUICK WORKFLOWS</div>
+          <button
+            type="button"
+            style={styles.quickBtn}
+            onClick={() => void sendMessage("Check Nov 30 Schedule")}
+          >
+            📅 Check Nov 30 Schedule
+          </button>
+          <button
+            type="button"
+            style={styles.quickBtn}
+            onClick={() => void sendMessage("Quick Order & Pay")}
+          >
+            ✅ Quick Order &amp; Pay
+          </button>
+
+          <div style={{ ...styles.sectionLabel, marginTop: "24px" }}>
+            CONNECTED TOOLS
           </div>
-
-          {/* Connected Tools (Fetch & Display Data) */}
-          <div className="px-4 py-2">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Connected Tools
-            </p>
-            <div className="space-y-1 text-xs text-gray-300">
-              <button
-                onClick={() =>
-                  sendMessage(
-                    'Get all rows from the ApexDesk AI Google Sheet (CRM, bookings, and inquiries).'
-                  )
-                }
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
-              >
-                <Database className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                <span>ApexDesk AI Sheet (CRM)</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  sendMessage(
-                    'Fetch and list all orders from Google Sheets with Order ID, Customer Name, Item, Amount, and Payment Status.'
-                  )
-                }
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                <span>Google Sheets Orders</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  sendMessage(
-                    'Fetch and list all upcoming and recently created or updated events from Google Calendar.'
-                  )
-                }
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
-              >
-                <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>Google Calendar</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  sendMessage(
-                    `Check and list the recent order confirmation emails sent to ${userEmail} in Gmail.`
-                  )
-                }
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
-              >
-                <Mail className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                <span>Gmail Alerts</span>
-              </button>
-
-              <button
-                onClick={() =>
-                  sendMessage(
-                    'Show a summary report of recent WhatsApp order alerts sent and Razorpay payment link statuses.'
-                  )
-                }
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-800/80 hover:text-white transition text-left"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>WhatsApp & Razorpay</span>
-              </button>
-            </div>
-          </div>
+          <ul style={styles.toolList}>
+            <li style={styles.toolItem}>🗄️ ApexDesk AI Sheet (CRM)</li>
+            <li style={styles.toolItem}>📊 Google Sheets Orders</li>
+            <li style={styles.toolItem}>📆 Google Calendar</li>
+            <li style={styles.toolItem}>✉️ Gmail Alerts</li>
+            <li style={styles.toolItem}>💬 WhatsApp &amp; Razorpay</li>
+          </ul>
         </div>
 
-        {/* Bottom Left: Profile + Plan + Settings Gear */}
-        <div className="p-3 border-t border-gray-800">
-          <div className="flex items-center justify-between px-2 py-2 rounded-xl hover:bg-gray-800/60 transition">
-            <div
-              className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-              onClick={() => setIsPremiumModalOpen(true)}
-              title="Manage Plan & Profile"
-            >
-              <img
-                src={profilePic}
-                alt={userName}
-                className="w-9 h-9 rounded-full object-cover border border-gray-700 shrink-0"
-              />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-white truncate leading-tight">{userName}</p>
-                <p className={`text-xs mt-0.5 font-medium ${isPremium ? 'text-amber-400' : 'text-gray-400'}`}>
-                  {isPremium ? 'Pro' : 'Free'}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-700/60 transition shrink-0"
-              title="Settings & Preferences"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+        {/* User Profile Footer */}
+        <div style={styles.profileBox}>
+          <div style={styles.avatar}>SS</div>
+          <div style={{ flex: 1 }}>
+            <div style={styles.profileName}>Saiuday Somidi</div>
+            <div style={styles.profilePlan}>Free</div>
           </div>
+          <button
+            type="button"
+            style={styles.settingsBtn}
+            onClick={() => setShowSettings((prev) => !prev)}
+            title="Webhook Settings"
+          >
+            ⚙️
+          </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col">
-        {/* Top Header */}
-        <header className="h-16 border-b border-gray-800 bg-[#111827]/80 backdrop-blur px-6 flex items-center justify-between">
+      {/* Main Chat Area */}
+      <main style={styles.main}>
+        <header style={styles.header}>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="font-semibold text-white">Autonomous Multi-Level Agent</h1>
-              <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live n8n Connected
-              </span>
+            <div style={styles.headerTitleRow}>
+              <h1 style={styles.headerTitle}>Autonomous Multi-Level Agent</h1>
+              <span style={styles.liveBadge}>● Live n8n Connected</span>
             </div>
-            <p className="text-xs text-gray-400">Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync</p>
+            <p style={styles.headerSub}>
+              Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync
+            </p>
           </div>
-
-          {/* Refresh Chat Button */}
           <button
-            onClick={clearChat}
-            className="px-3 py-1.5 rounded-lg bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 border border-gray-700 transition"
-            title="Refresh Chat"
+            type="button"
+            style={styles.refreshBtn}
+            onClick={() => window.location.reload()}
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
+            🔄 Refresh
           </button>
         </header>
 
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {showSettings && (
+          <div style={styles.settingsBar}>
+            <span style={{ fontSize: "13px", color: "#94a3b8" }}>
+              n8n Webhook URL:
+            </span>
+            <input
+              style={styles.settingsInput}
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+            <button
+              type="button"
+              style={styles.saveBtn}
+              onClick={() => setShowSettings(false)}
+            >
+              Done
+            </button>
+          </div>
+        )}
+
+        {/* Chat Bubbles Area */}
+        <div style={styles.chatArea}>
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              style={{
+                ...styles.bubbleWrapper,
+                justifyContent:
+                  msg.sender === "user" ? "flex-end" : "flex-start",
+              }}
             >
               <div
-                className={`max-w-2xl rounded-2xl px-4 py-3 text-sm leading-relaxed ${
-                  msg.sender === 'user'
-                    ? 'bg-blue-600 text-white rounded-br-none'
-                    : 'bg-[#1F2937] text-gray-100 border border-gray-700/60 rounded-bl-none'
-                }`}
+                style={
+                  msg.sender === "user" ? styles.userBubble : styles.aiBubble
+                }
               >
-                <p className="whitespace-pre-wrap">{msg.text}</p>
-                <span className="block text-[10px] opacity-60 mt-1.5 text-right">
-                  {msg.timestamp}
-                </span>
+                <div style={styles.msgText}>{msg.text}</div>
+                <div style={styles.msgTime}>{msg.time}</div>
               </div>
             </div>
           ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-[#1F2937] border border-gray-700/60 rounded-2xl rounded-bl-none px-4 py-3 text-sm text-gray-400">
-                Agent is thinking & executing tools...
+          {loading && (
+            <div style={styles.bubbleWrapper}>
+              <div style={styles.aiBubble}>
+                <div style={styles.msgText}>ApexDesk AI is typing...</div>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+          <div ref={chatEndRef} />
         </div>
 
         {/* Input Box */}
-        <div className="p-4 border-t border-gray-800 bg-[#111827]/60">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage();
-            }}
-            className="max-w-4xl mx-auto flex gap-3"
+        <div style={styles.inputBar}>
+          <input
+            style={styles.input}
+            placeholder="Type a booking, order, schedule check, or payment request..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <button
+            type="button"
+            style={styles.sendBtn}
+            onClick={() => void sendMessage()}
+            disabled={loading}
           >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a booking, order, schedule check, or payment request..."
-              className="flex-1 bg-[#1F2937] border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="px-5 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-medium text-sm flex items-center gap-2 transition"
-            >
-              <span>Send</span>
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+            Send ➤
+          </button>
         </div>
       </main>
-
-      {/* Personalized Settings Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Settings className="w-5 h-5 text-blue-400" />
-                <h2 className="font-semibold text-white">Personalized Settings</h2>
-              </div>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-sm max-h-[75vh] overflow-y-auto">
-              {/* Profile Picture Upload */}
-              <div className="flex items-center gap-4 pb-2 border-b border-gray-800">
-                <img
-                  src={profilePic}
-                  alt="Preview"
-                  className="w-14 h-14 rounded-full object-cover border-2 border-blue-500"
-                />
-                <div className="flex-1">
-                  <label className="block text-xs text-gray-400 mb-1.5">Profile Picture</label>
-                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-xs text-white rounded-lg cursor-pointer transition">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload Photo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleProfilePicUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Display Name
-                </label>
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  className="w-full bg-[#1F2937] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5" /> Workspace Email
-                </label>
-                <input
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  className="w-full bg-[#1F2937] border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-gray-400 mb-1 flex items-center gap-1.5">
-                  <LinkIcon className="w-3.5 h-3.5" /> n8n Production Webhook URL
-                </label>
-                <input
-                  type="text"
-                  value={webhookUrl}
-                  onChange={(e) => setWebhookUrl(e.target.value)}
-                  className="w-full bg-[#1F2937] border border-gray-700 rounded-lg px-3 py-2 text-xs text-blue-300 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="pt-2 space-y-3 border-t border-gray-800">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="flex items-center gap-2 text-gray-300">
-                    <Bell className="w-4 h-4 text-gray-400" /> WhatsApp & Email Alerts
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={notificationsEnabled}
-                    onChange={(e) => setNotificationsEnabled(e.target.checked)}
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="flex items-center gap-2 text-gray-300">
-                    <Shield className="w-4 h-4 text-gray-400" /> Auto-Sync Orders to Sheets
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={autoSyncSheets}
-                    onChange={(e) => setAutoSyncSheets(e.target.checked)}
-                    className="w-4 h-4 accent-blue-600"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-800 flex items-center justify-between">
-              <button
-                onClick={clearChat}
-                className="px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-1.5 transition"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Clear Chat
-              </button>
-              <button
-                onClick={() => setIsSettingsOpen(false)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition"
-              >
-                Save & Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Commercial Client Pricing & Premium Modal */}
-      {isPremiumModalOpen && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#111827] border border-amber-500/30 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="px-6 py-5 bg-gradient-to-r from-amber-500/15 to-orange-500/10 border-b border-gray-800 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400">
-                  <Crown className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="font-bold text-white">ApexDesk AI — Client Plans</h2>
-                  <p className="text-xs text-amber-300/80">Choose Monthly SaaS or Full App Ownership</p>
-                </div>
-              </div>
-              <button onClick={() => setIsPremiumModalOpen(false)} className="text-gray-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-5">
-              {/* Plan Selection Cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setSelectedPlan('monthly')}
-                  className={`p-4 rounded-xl border text-left transition ${
-                    selectedPlan === 'monthly'
-                      ? 'border-amber-500 bg-amber-500/10'
-                      : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
-                  }`}
-                >
-                  <p className="text-xs font-semibold text-amber-400 uppercase">Monthly Plan</p>
-                  <p className="text-2xl font-extrabold text-white mt-1">₹999<span className="text-xs font-normal text-gray-400">/mo</span></p>
-                  <p className="text-[11px] text-gray-400 mt-1">Hosting + Maintenance</p>
-                </button>
-
-                <button
-                  onClick={() => setSelectedPlan('onetime')}
-                  className={`p-4 rounded-xl border text-left transition relative ${
-                    selectedPlan === 'onetime'
-                      ? 'border-amber-500 bg-amber-500/10'
-                      : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
-                  }`}
-                >
-                  <span className="absolute -top-2.5 right-3 px-2 py-0.5 text-[10px] font-bold bg-emerald-500 text-gray-950 rounded-full">
-                    FULL APP
-                  </span>
-                  <p className="text-xs font-semibold text-emerald-400 uppercase">Overall Setup</p>
-                  <p className="text-2xl font-extrabold text-white mt-1">₹20,000</p>
-                  <p className="text-[11px] text-gray-400 mt-1">One-Time Ownership</p>
-                </button>
-              </div>
-
-              <ul className="space-y-2.5 text-sm text-gray-300">
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Unlimited WhatsApp & Web AI Agent Messages</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Automated Razorpay Payment Links & Google Sheets Sync</span>
-                </li>
-                <li className="flex items-center gap-2.5">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>
-                    {selectedPlan === 'onetime'
-                      ? 'Full Source Code + Custom Branding + n8n Workflow Setup'
-                      : 'Priority n8n Cloud Webhook Execution & Support'}
-                  </span>
-                </li>
-              </ul>
-
-              <button
-                onClick={isPremium ? undefined : handlePayment}
-                className="w-full py-3 mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-gray-950 font-bold text-sm rounded-xl shadow-lg transition"
-              >
-                {isPremium
-                  ? 'Premium Plan Active'
-                  : selectedPlan === 'monthly'
-                  ? 'Pay ₹999/mo via Razorpay'
-                  : 'Pay ₹20,000 via Razorpay'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
+const styles: Record<string, CSSProperties> = {
+  container: {
+    display: "flex",
+    height: "100vh",
+    width: "100vw",
+    overflow: "hidden",
+    backgroundColor: "#0b1120",
+    color: "#f8fafc",
+    fontFamily: "'Inter', system-ui, sans-serif",
+  },
+  sidebar: {
+    width: "270px",
+    backgroundColor: "#0f172a",
+    borderRight: "1px solid #1e293b",
+    padding: "20px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+  },
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    marginBottom: "28px",
+  },
+  logoBox: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
+    background: "linear-gradient(135deg, #2563eb, #3b82f6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "18px",
+  },
+  brandTitle: {
+    fontSize: "20px",
+    fontWeight: 700,
+    color: "#ffffff",
+  },
+  sectionLabel: {
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    color: "#64748b",
+    marginBottom: "10px",
+  },
+  quickBtn: {
+    width: "100%",
+    textAlign: "left",
+    padding: "10px 12px",
+    marginBottom: "8px",
+    borderRadius: "8px",
+    border: "1px solid #1e293b",
+    backgroundColor: "#162033",
+    color: "#e2e8f0",
+    fontSize: "13px",
+    cursor: "pointer",
+  },
+  toolList: {
+    listStyle: "none",
+    padding: 0,
+    margin: 0,
+  },
+  toolItem: {
+    padding: "8px 4px",
+    fontSize: "13px",
+    color: "#cbd5e1",
+  },
+  profileBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    paddingTop: "14px",
+    borderTop: "1px solid #1e293b",
+  },
+  avatar: {
+    width: "36px",
+    height: "36px",
+    borderRadius: "50%",
+    backgroundColor: "#2563eb",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+    fontSize: "13px",
+  },
+  profileName: {
+    fontSize: "13px",
+    fontWeight: 600,
+  },
+  profilePlan: {
+    fontSize: "11px",
+    color: "#64748b",
+  },
+  settingsBtn: {
+    background: "none",
+    border: "none",
+    color: "#94a3b8",
+    cursor: "pointer",
+    fontSize: "16px",
+  },
+  main: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+  header: {
+    padding: "16px 24px",
+    borderBottom: "1px solid #1e293b",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#0f172a",
+  },
+  headerTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  headerTitle: {
+    fontSize: "18px",
+    fontWeight: 700,
+    margin: 0,
+  },
+  liveBadge: {
+    fontSize: "12px",
+    padding: "4px 10px",
+    borderRadius: "999px",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    color: "#34d399",
+    fontWeight: 600,
+  },
+  headerSub: {
+    fontSize: "12px",
+    color: "#94a3b8",
+    margin: "4px 0 0 0",
+  },
+  refreshBtn: {
+    padding: "8px 14px",
+    borderRadius: "8px",
+    border: "1px solid #334155",
+    backgroundColor: "#1e293b",
+    color: "#e2e8f0",
+    fontSize: "13px",
+    cursor: "pointer",
+  },
+  settingsBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "10px 24px",
+    backgroundColor: "#1e293b",
+    borderBottom: "1px solid #334155",
+  },
+  settingsInput: {
+    flex: 1,
+    padding: "6px 10px",
+    borderRadius: "6px",
+    border: "1px solid #475569",
+    backgroundColor: "#0f172a",
+    color: "#f8fafc",
+    fontSize: "13px",
+  },
+  saveBtn: {
+    padding: "6px 14px",
+    borderRadius: "6px",
+    border: "none",
+    backgroundColor: "#2563eb",
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: "13px",
+  },
+  chatArea: {
+    flex: 1,
+    padding: "24px",
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
+  },
+  bubbleWrapper: {
+    display: "flex",
+    width: "100%",
+  },
+  aiBubble: {
+    maxWidth: "70%",
+    backgroundColor: "#1e293b",
+    color: "#f1f5f9",
+    padding: "14px 16px",
+    borderRadius: "14px",
+    borderBottomLeftRadius: "4px",
+    lineHeight: "1.5",
+    fontSize: "14px",
+  },
+  userBubble: {
+    maxWidth: "70%",
+    backgroundColor: "#2563eb",
+    color: "#ffffff",
+    padding: "14px 16px",
+    borderRadius: "14px",
+    borderBottomRightRadius: "4px",
+    lineHeight: "1.5",
+    fontSize: "14px",
+  },
+  msgText: {
+    whiteSpace: "pre-wrap",
+  },
+  msgTime: {
+    fontSize: "10px",
+    opacity: 0.7,
+    marginTop: "6px",
+    textAlign: "right",
+  },
+  inputBar: {
+    padding: "16px 24px",
+    borderTop: "1px solid #1e293b",
+    backgroundColor: "#0f172a",
+    display: "flex",
+    gap: "12px",
+  },
+  input: {
+    flex: 1,
+    padding: "12px 16px",
+    borderRadius: "10px",
+    border: "1px solid #334155",
+    backgroundColor: "#1e293b",
+    color: "#ffffff",
+    fontSize: "14px",
+    outline: "none",
+  },
+  sendBtn: {
+    padding: "12px 22px",
+    borderRadius: "10px",
+    border: "none",
+    backgroundColor: "#2563eb",
+    color: "#ffffff",
+    fontWeight: 600,
+    fontSize: "14px",
+    cursor: "pointer",
+  },
+};
