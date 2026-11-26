@@ -1,524 +1,483 @@
-import { useState, useRef, useEffect, type KeyboardEvent, type CSSProperties } from "react";
+import React, { useState, useEffect } from "react";
 
 interface ChatMessage {
-  id: number;
-  sender: "user" | "ai";
+  id: string;
+  sender: "user" | "agent";
   text: string;
-  time: string;
+  timestamp: string;
+  channel: string;
 }
 
-const DEFAULT_WEBHOOK_URL = "https://uday1997.app.n8n.cloud/webhook/contact";
+const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook-test/contact";
+const RAZORPAY_MONTHLY_LINK = "https://rzp.io/l/your-999-monthly-link";
+const RAZORPAY_ONETIME_LINK = "https://rzp.io/l/your-20000-onetime-link";
 
 export default function App() {
+  const [email, setEmail] = useState<string>("");
+  const [activeEmail, setActiveEmail] = useState<string>("");
+  const [daysLeft, setDaysLeft] = useState<number>(0);
+  const [isTrialActive, setIsTrialActive] = useState<boolean>(false);
+  const [expiryDateStr, setExpiryDateStr] = useState<string>("");
+
+  const [selectedChannel, setSelectedChannel] = useState<string>("WhatsApp");
+  const [clientName, setClientName] = useState<string>("");
+  const [clientPhone, setClientPhone] = useState<string>("");
+  const [inputMessage, setInputMessage] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: 1,
-      sender: "ai",
-      text: "Welcome to ApexDesk AI! Connected to your Google Workspace (saiuday81618@gmail.com). Type a request below to book appointments, check schedules, place orders, or update Google Sheets, Calendar, Gmail & WhatsApp.",
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      id: "welcome-1",
+      sender: "agent",
+      text: "Hello! Welcome to ApexDesk Multi-Level AI Agent. Ask me to book an appointment, reschedule, check availability, or capture a new client lead.",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      channel: "System",
     },
   ]);
-  const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [webhookUrl, setWebhookUrl] = useState<string>(DEFAULT_WEBHOOK_URL);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const [error, setError] = useState<string>("");
+
+  const evaluateTrialStatus = (userEmail: string) => {
+    const cleanEmail = userEmail.trim().toLowerCase();
+    if (!cleanEmail) return;
+
+    const storageKey = `apexdesk_trial_${cleanEmail}`;
+    let startTimestamp = localStorage.getItem(storageKey);
+
+    if (!startTimestamp) {
+      startTimestamp = Date.now().toString();
+      localStorage.setItem(storageKey, startTimestamp);
+    }
+
+    const startDate = new Date(parseInt(startTimestamp, 10));
+    const expiryDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const diffMs = expiryDate.getTime() - now.getTime();
+    const remainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    setActiveEmail(cleanEmail);
+    setExpiryDateStr(
+      expiryDate.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    );
+
+    if (remainingDays > 0) {
+      setDaysLeft(remainingDays);
+      setIsTrialActive(true);
+    } else {
+      setDaysLeft(0);
+      setIsTrialActive(false);
+    }
+  };
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const savedLastUser = localStorage.getItem("apexdesk_last_email");
+    if (savedLastUser) {
+      setEmail(savedLastUser);
+      evaluateTrialStatus(savedLastUser);
+    }
+  }, []);
 
-  const sendMessage = async (customText?: string) => {
-    const textToSend = (customText !== undefined ? customText : input).trim();
-    if (!textToSend || loading) return;
+  const handleActivateTrial = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    localStorage.setItem("apexdesk_last_email", email.trim().toLowerCase());
+    evaluateTrialStatus(email);
+  };
 
-    const currentTime = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputMessage.trim() || !isTrialActive || loading) return;
 
-    const userMsg: ChatMessage = {
-      id: Date.now(),
+    const userText = inputMessage.trim();
+    const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    const newUserMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
       sender: "user",
-      text: textToSend,
-      time: currentTime,
+      text: userText,
+      timestamp: nowTime,
+      channel: selectedChannel,
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    if (customText === undefined) {
-      setInput("");
-    }
+    setMessages((prev) => [...prev, newUserMsg]);
+    setInputMessage("");
     setLoading(true);
+    setError("");
 
     try {
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(N8N_APEXDESK_WEBHOOK_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          message: textToSend,
-          chatInput: textToSend,
-          source: "vercel_web_app",
-          telegramChatId: "6202497965",
+          message: userText,
+          chatInput: userText,
+          channel: selectedChannel,
+          client_name: clientName || "Website Lead",
+          client_phone: clientPhone || "N/A",
+          client_email: activeEmail,
+          sessionId: activeEmail,
         }),
       });
 
-      const rawText = await response.text();
-      let aiReply = "";
-
-      if (rawText) {
-        try {
-          const parsed: unknown = JSON.parse(rawText);
-          const item = (Array.isArray(parsed) ? parsed[0] : parsed) as Record<string, unknown>;
-          const extracted =
-            item?.output ??
-            item?.reply ??
-            item?.message ??
-            item?.text ??
-            item?.response;
-
-          if (typeof extracted === "string" && extracted.trim().length > 0) {
-            aiReply = extracted;
-          } else if (typeof item === "string") {
-            aiReply = item;
-          } else {
-            aiReply = rawText;
-          }
-        } catch {
-          aiReply = rawText;
-        }
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Agent Error (${response.status}): ${errText}`);
       }
 
-      if (!aiReply || aiReply === "{}" || aiReply === "[]") {
-        aiReply = "Message received by ApexDesk AI and synced with Telegram.";
-      }
+      const data = await response.json();
+      const record = Array.isArray(data) ? data[0] : data;
+      const replyText =
+        record?.output ||
+        record?.reply ||
+        record?.message ||
+        record?.text ||
+        "Request processed. Lead updated in Google Sheets & Calendar/Email triggered.";
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          sender: "ai",
-          text: aiReply,
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          sender: "ai",
-          text: "Unable to reach n8n webhook. Please check if your workflow is Published.",
-          time: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
+      const newAgentMsg: ChatMessage = {
+        id: `agent-${Date.now()}`,
+        sender: "agent",
+        text: replyText,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        channel: selectedChannel,
+      };
+
+      setMessages((prev) => [...prev, newAgentMsg]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to reach ApexDesk AI Agent";
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void sendMessage();
-    }
+  const triggerQuickPrompt = (promptText: string) => {
+    setInputMessage(promptText);
   };
 
   return (
-    <div style={styles.container}>
-      {/* Left Dashboard Sidebar */}
-      <aside style={styles.sidebar}>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row font-sans">
+      <aside className="w-full lg:w-80 bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-800 p-6 flex flex-col justify-between">
         <div>
-          <div style={styles.brand}>
-            <div style={styles.logoBox}>✨</div>
-            <span style={styles.brandTitle}>ApexDesk AI</span>
+          <div className="flex items-center gap-2.5 mb-6">
+            <span className="text-2xl">⚡</span>
+            <div>
+              <h2 className="text-lg font-bold tracking-tight text-white">
+                ApexDesk AI
+              </h2>
+              <p className="text-xs text-indigo-400 font-medium">
+                Multi-Level Business Agent
+              </p>
+            </div>
           </div>
 
-          <div style={styles.sectionLabel}>QUICK WORKFLOWS</div>
-          <button
-            type="button"
-            style={styles.quickBtn}
-            onClick={() => void sendMessage("Check Nov 30 Schedule")}
-          >
-            📅 Check Nov 30 Schedule
-          </button>
-          <button
-            type="button"
-            style={styles.quickBtn}
-            onClick={() => void sendMessage("Quick Order & Pay")}
-          >
-            ✅ Quick Order &amp; Pay
-          </button>
+          <div className="bg-slate-800/70 border border-slate-700 rounded-xl p-4 mb-6">
+            <h3 className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-3">
+              7-Day Free Trial Access
+            </h3>
 
-          <div style={{ ...styles.sectionLabel, marginTop: "24px" }}>
-            CONNECTED TOOLS
+            <form onSubmit={handleActivateTrial} className="space-y-3">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="owner@business.com"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+              <button
+                type="submit"
+                className="w-full py-2 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white transition"
+              >
+                {activeEmail ? "Switch / Check Trial" : "Start 7-Day Free Trial"}
+              </button>
+            </form>
+
+            {activeEmail && (
+              <div className="mt-4 pt-3 border-t border-slate-700">
+                {isTrialActive ? (
+                  <div className="bg-emerald-950/60 border border-emerald-700/60 rounded-lg p-3">
+                    <p className="text-xs text-emerald-300 font-semibold">
+                      ACTIVE: {daysLeft} {daysLeft === 1 ? "Day" : "Days"} Left
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Valid until {expiryDateStr}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-rose-950/60 border border-rose-700/60 rounded-lg p-3">
+                    <p className="text-xs text-rose-300 font-semibold">
+                      TRIAL EXPIRED
+                    </p>
+                    <p className="text-[11px] text-slate-300 mt-1">
+                      Upgrade below to keep your AI agent live 24/7.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <ul style={styles.toolList}>
-            <li style={styles.toolItem}>🗄️ ApexDesk AI Sheet (CRM)</li>
-            <li style={styles.toolItem}>📊 Google Sheets Orders</li>
-            <li style={styles.toolItem}>📆 Google Calendar</li>
-            <li style={styles.toolItem}>✉️ Gmail Alerts</li>
-            <li style={styles.toolItem}>💬 WhatsApp &amp; Razorpay</li>
-          </ul>
+
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 mb-6 space-y-2">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Included Integrations
+            </h3>
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>WhatsApp & Telegram Bot</span>
+              <span className="text-emerald-400 font-semibold">Active</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>Google Calendar Booking</span>
+              <span className="text-emerald-400 font-semibold">Active</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>Google Sheets Lead CRM</span>
+              <span className="text-emerald-400 font-semibold">Active</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>Gmail Auto-Confirmations</span>
+              <span className="text-emerald-400 font-semibold">Active</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Commercial Plans
+            </h3>
+            <a
+              href={RAZORPAY_MONTHLY_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-center py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold text-white transition"
+            >
+              Monthly Plan — ₹999/mo
+            </a>
+            <a
+              href={RAZORPAY_ONETIME_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-center py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm font-semibold text-white transition"
+            >
+              Full App License — ₹20,000
+            </a>
+          </div>
         </div>
 
-        {/* User Profile Footer */}
-        <div style={styles.profileBox}>
-          <div style={styles.avatar}>SS</div>
-          <div style={{ flex: 1 }}>
-            <div style={styles.profileName}>Saiuday Somidi</div>
-            <div style={styles.profilePlan}>Free</div>
-          </div>
-          <button
-            type="button"
-            style={styles.settingsBtn}
-            onClick={() => setShowSettings((prev) => !prev)}
-            title="Webhook Settings"
-          >
-            ⚙️
-          </button>
-        </div>
+        <p className="text-xs text-slate-500 mt-8">
+          ApexDesk AI • Multi-Channel Automation
+        </p>
       </aside>
 
-      {/* Main Chat Area */}
-      <main style={styles.main}>
-        <header style={styles.header}>
+      <main className="flex-1 p-6 md:p-10 max-w-6xl mx-auto w-full">
+        <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div style={styles.headerTitleRow}>
-              <h1 style={styles.headerTitle}>Autonomous Multi-Level Agent</h1>
-              <span style={styles.liveBadge}>● Live n8n Connected</span>
-            </div>
-            <p style={styles.headerSub}>
-              Sheets CRM • Google Calendar • Gmail • WhatsApp Auto-Sync
+            <h1 className="text-2xl md:text-3xl font-bold text-white">
+              ApexDesk Multi-Level AI Agent
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              24/7 Autonomous Receptionist, Lead Manager, Calendar Scheduler & Email Dispatcher
             </p>
           </div>
-          <button
-            type="button"
-            style={styles.refreshBtn}
-            onClick={() => window.location.reload()}
-          >
-            🔄 Refresh
-          </button>
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-emerald-400 font-medium w-fit">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Multi-Level Workflow Ready
+          </div>
         </header>
 
-        {showSettings && (
-          <div style={styles.settingsBar}>
-            <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-              n8n Webhook URL:
-            </span>
-            <input
-              style={styles.settingsInput}
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-            />
-            <button
-              type="button"
-              style={styles.saveBtn}
-              onClick={() => setShowSettings(false)}
-            >
-              Done
-            </button>
+        {!activeEmail ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center space-y-3">
+            <h2 className="text-lg font-semibold text-white">
+              Activate Your 7-Day Free Trial
+            </h2>
+            <p className="text-slate-400 text-sm max-w-lg mx-auto">
+              Enter your business email in the left sidebar to test live appointment scheduling, lead capture, WhatsApp/Telegram routing, and Gmail confirmations.
+            </p>
+          </div>
+        ) : !isTrialActive ? (
+          <div className="bg-rose-950/30 border border-rose-800 rounded-2xl p-8 text-center space-y-4">
+            <h2 className="text-xl font-bold text-rose-300">
+              Your 7-Day Free Trial Has Ended
+            </h2>
+            <p className="text-slate-300 text-sm max-w-md mx-auto">
+              Continue automating your client leads, calendar appointments, and multi-channel messages with ₹999/month or ₹20,000 full ownership.
+            </p>
+            <div className="flex flex-wrap justify-center gap-4 pt-2">
+              <a
+                href={RAZORPAY_MONTHLY_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 px-6 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold text-white"
+              >
+                Subscribe — ₹999/month
+              </a>
+              <a
+                href={RAZORPAY_ONETIME_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white"
+              >
+                Buy Full License — ₹20,000
+              </a>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <section className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 h-fit">
+              <h2 className="text-base font-semibold text-white">
+                Channel & Lead Context
+              </h2>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">
+                  Active Channel Simulation
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {["WhatsApp", "Telegram", "Web Chat"].map((ch) => (
+                    <button
+                      key={ch}
+                      type="button"
+                      onClick={() => setSelectedChannel(ch)}
+                      className={`py-2 px-2 rounded-lg text-xs font-semibold border transition ${
+                        selectedChannel === ch
+                          ? "bg-indigo-600 border-indigo-500 text-white"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Client / Lead Name
+                </label>
+                <input
+                  type="text"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="e.g. Karthik Sharma"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Client Phone / ID
+                </label>
+                <input
+                  type="text"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="e.g. +91 9876543210"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 space-y-2">
+                <p className="text-xs font-semibold text-slate-400">
+                  Quick Test Actions
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerQuickPrompt("Book an appointment for tomorrow at 11:00 AM and send confirmation email.")
+                  }
+                  className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
+                >
+                  📅 Book Calendar Appointment + Gmail
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerQuickPrompt("Register me as a new high-priority lead for AI automation services.")
+                  }
+                  className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
+                >
+                  📊 Log New Lead in Google Sheets
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerQuickPrompt("Cancel my scheduled meeting and update my lead status.")
+                  }
+                  className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
+                >
+                  ❌ Cancel Meeting & Update Status
+                </button>
+              </div>
+            </section>
+
+            <section className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col h-[560px]">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h2 className="text-base font-semibold text-white">
+                  Live Multi-Level Agent Console ({selectedChannel})
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Trial User: {activeEmail}
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto py-4 space-y-3 pr-1">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col max-w-[82%] ${
+                      msg.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
+                    }`}
+                  >
+                    <div
+                      className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                        msg.sender === "user"
+                          ? "bg-indigo-600 text-white rounded-br-sm"
+                          : "bg-slate-950 border border-slate-800 text-slate-200 rounded-bl-sm"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-1 px-1">
+                      {msg.channel} • {msg.timestamp}
+                    </span>
+                  </div>
+                ))}
+
+                {loading && (
+                  <div className="mr-auto bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs text-indigo-400">
+                    ApexDesk AI is checking Calendar, Sheets & drafting response...
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="mb-3 p-2.5 rounded-lg bg-rose-950/70 border border-rose-800 text-xs text-rose-300">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSendMessage} className="pt-3 border-t border-slate-800 flex gap-2">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  placeholder={`Message ApexDesk AI via ${selectedChannel}...`}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!inputMessage.trim() || loading}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-sm font-semibold text-white transition"
+                >
+                  Send
+                </button>
+              </form>
+            </section>
           </div>
         )}
-
-        {/* Chat Bubbles Area */}
-        <div style={styles.chatArea}>
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              style={{
-                ...styles.bubbleWrapper,
-                justifyContent:
-                  msg.sender === "user" ? "flex-end" : "flex-start",
-              }}
-            >
-              <div
-                style={
-                  msg.sender === "user" ? styles.userBubble : styles.aiBubble
-                }
-              >
-                <div style={styles.msgText}>{msg.text}</div>
-                <div style={styles.msgTime}>{msg.time}</div>
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div style={styles.bubbleWrapper}>
-              <div style={styles.aiBubble}>
-                <div style={styles.msgText}>ApexDesk AI is typing...</div>
-              </div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Input Box */}
-        <div style={styles.inputBar}>
-          <input
-            style={styles.input}
-            placeholder="Type a booking, order, schedule check, or payment request..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-          <button
-            type="button"
-            style={styles.sendBtn}
-            onClick={() => void sendMessage()}
-            disabled={loading}
-          >
-            Send ➤
-          </button>
-        </div>
       </main>
     </div>
   );
 }
-
-const styles: Record<string, CSSProperties> = {
-  container: {
-    display: "flex",
-    height: "100vh",
-    width: "100vw",
-    overflow: "hidden",
-    backgroundColor: "#0b1120",
-    color: "#f8fafc",
-    fontFamily: "'Inter', system-ui, sans-serif",
-  },
-  sidebar: {
-    width: "270px",
-    backgroundColor: "#0f172a",
-    borderRight: "1px solid #1e293b",
-    padding: "20px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-  },
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "28px",
-  },
-  logoBox: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "10px",
-    background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "18px",
-  },
-  brandTitle: {
-    fontSize: "20px",
-    fontWeight: 700,
-    color: "#ffffff",
-  },
-  sectionLabel: {
-    fontSize: "11px",
-    fontWeight: 700,
-    letterSpacing: "0.08em",
-    color: "#64748b",
-    marginBottom: "10px",
-  },
-  quickBtn: {
-    width: "100%",
-    textAlign: "left",
-    padding: "10px 12px",
-    marginBottom: "8px",
-    borderRadius: "8px",
-    border: "1px solid #1e293b",
-    backgroundColor: "#162033",
-    color: "#e2e8f0",
-    fontSize: "13px",
-    cursor: "pointer",
-  },
-  toolList: {
-    listStyle: "none",
-    padding: 0,
-    margin: 0,
-  },
-  toolItem: {
-    padding: "8px 4px",
-    fontSize: "13px",
-    color: "#cbd5e1",
-  },
-  profileBox: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    paddingTop: "14px",
-    borderTop: "1px solid #1e293b",
-  },
-  avatar: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "50%",
-    backgroundColor: "#2563eb",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: 700,
-    fontSize: "13px",
-  },
-  profileName: {
-    fontSize: "13px",
-    fontWeight: 600,
-  },
-  profilePlan: {
-    fontSize: "11px",
-    color: "#64748b",
-  },
-  settingsBtn: {
-    background: "none",
-    border: "none",
-    color: "#94a3b8",
-    cursor: "pointer",
-    fontSize: "16px",
-  },
-  main: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-  },
-  header: {
-    padding: "16px 24px",
-    borderBottom: "1px solid #1e293b",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#0f172a",
-  },
-  headerTitleRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  headerTitle: {
-    fontSize: "18px",
-    fontWeight: 700,
-    margin: 0,
-  },
-  liveBadge: {
-    fontSize: "12px",
-    padding: "4px 10px",
-    borderRadius: "999px",
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-    color: "#34d399",
-    fontWeight: 600,
-  },
-  headerSub: {
-    fontSize: "12px",
-    color: "#94a3b8",
-    margin: "4px 0 0 0",
-  },
-  refreshBtn: {
-    padding: "8px 14px",
-    borderRadius: "8px",
-    border: "1px solid #334155",
-    backgroundColor: "#1e293b",
-    color: "#e2e8f0",
-    fontSize: "13px",
-    cursor: "pointer",
-  },
-  settingsBar: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 24px",
-    backgroundColor: "#1e293b",
-    borderBottom: "1px solid #334155",
-  },
-  settingsInput: {
-    flex: 1,
-    padding: "6px 10px",
-    borderRadius: "6px",
-    border: "1px solid #475569",
-    backgroundColor: "#0f172a",
-    color: "#f8fafc",
-    fontSize: "13px",
-  },
-  saveBtn: {
-    padding: "6px 14px",
-    borderRadius: "6px",
-    border: "none",
-    backgroundColor: "#2563eb",
-    color: "#fff",
-    cursor: "pointer",
-    fontSize: "13px",
-  },
-  chatArea: {
-    flex: 1,
-    padding: "24px",
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "14px",
-  },
-  bubbleWrapper: {
-    display: "flex",
-    width: "100%",
-  },
-  aiBubble: {
-    maxWidth: "70%",
-    backgroundColor: "#1e293b",
-    color: "#f1f5f9",
-    padding: "14px 16px",
-    borderRadius: "14px",
-    borderBottomLeftRadius: "4px",
-    lineHeight: "1.5",
-    fontSize: "14px",
-  },
-  userBubble: {
-    maxWidth: "70%",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    padding: "14px 16px",
-    borderRadius: "14px",
-    borderBottomRightRadius: "4px",
-    lineHeight: "1.5",
-    fontSize: "14px",
-  },
-  msgText: {
-    whiteSpace: "pre-wrap",
-  },
-  msgTime: {
-    fontSize: "10px",
-    opacity: 0.7,
-    marginTop: "6px",
-    textAlign: "right",
-  },
-  inputBar: {
-    padding: "16px 24px",
-    borderTop: "1px solid #1e293b",
-    backgroundColor: "#0f172a",
-    display: "flex",
-    gap: "12px",
-  },
-  input: {
-    flex: 1,
-    padding: "12px 16px",
-    borderRadius: "10px",
-    border: "1px solid #334155",
-    backgroundColor: "#1e293b",
-    color: "#ffffff",
-    fontSize: "14px",
-    outline: "none",
-  },
-  sendBtn: {
-    padding: "12px 22px",
-    borderRadius: "10px",
-    border: "none",
-    backgroundColor: "#2563eb",
-    color: "#ffffff",
-    fontWeight: 600,
-    fontSize: "14px",
-    cursor: "pointer",
-  },
-};
