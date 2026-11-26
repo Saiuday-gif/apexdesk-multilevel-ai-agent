@@ -8,7 +8,7 @@ interface ChatMessage {
   channel: string;
 }
 
-const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact";
+const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact"; // Replace with your actual n8n webhook URL
 const RAZORPAY_MONTHLY_LINK = "https://rzp.io/l/your-999-monthly-link";
 const RAZORPAY_ONETIME_LINK = "https://rzp.io/l/your-20000-onetime-link";
 
