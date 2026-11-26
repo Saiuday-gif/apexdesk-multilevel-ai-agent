@@ -8,7 +8,7 @@ interface ChatMessage {
   channel: string;
 }
 
-const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook-test/contact";
+const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact";
 const RAZORPAY_MONTHLY_LINK = "https://rzp.io/l/your-999-monthly-link";
 const RAZORPAY_ONETIME_LINK = "https://rzp.io/l/your-20000-onetime-link";
 
@@ -27,7 +27,7 @@ export default function App() {
     {
       id: "welcome-1",
       sender: "agent",
-      text: "Hello! Welcome to ApexDesk Multi-Level AI Agent. Ask me to book an appointment, reschedule, check availability, or capture a new client lead.",
+      text: "Hello! Welcome to ApexDesk Multi-Level AI Agent. Ask me to place or track orders in Google Sheets, book appointments, manage leads, or send email confirmations.",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       channel: "System",
     },
@@ -111,6 +111,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({
           message: userText,
@@ -135,7 +136,7 @@ export default function App() {
         record?.reply ||
         record?.message ||
         record?.text ||
-        "Request processed. Lead updated in Google Sheets & Calendar/Email triggered.";
+        "Request processed. Orders & Leads Google Sheets, Calendar, and Gmail updated.";
 
       const newAgentMsg: ChatMessage = {
         id: `agent-${Date.now()}`,
@@ -147,7 +148,10 @@ export default function App() {
 
       setMessages((prev) => [...prev, newAgentMsg]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to reach ApexDesk AI Agent";
+      const message =
+        err instanceof Error
+          ? `${err.message} — Verify Docker n8n workflow is Active and Webhook CORS is set to *`
+          : "Failed to reach ApexDesk AI Agent";
       setError(message);
     } finally {
       setLoading(false);
@@ -230,11 +234,15 @@ export default function App() {
               <span className="text-emerald-400 font-semibold">Active</span>
             </div>
             <div className="flex items-center justify-between text-xs text-slate-300">
-              <span>Google Calendar Booking</span>
+              <span>Google Sheets Orders Sheet</span>
               <span className="text-emerald-400 font-semibold">Active</span>
             </div>
             <div className="flex items-center justify-between text-xs text-slate-300">
               <span>Google Sheets Lead CRM</span>
+              <span className="text-emerald-400 font-semibold">Active</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>Google Calendar Booking</span>
               <span className="text-emerald-400 font-semibold">Active</span>
             </div>
             <div className="flex items-center justify-between text-xs text-slate-300">
@@ -278,7 +286,7 @@ export default function App() {
               ApexDesk Multi-Level AI Agent
             </h1>
             <p className="text-slate-400 text-sm mt-1">
-              24/7 Autonomous Receptionist, Lead Manager, Calendar Scheduler & Email Dispatcher
+              24/7 Autonomous Receptionist, Order Processor, Lead Manager & Calendar Scheduler
             </p>
           </div>
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full text-xs text-emerald-400 font-medium w-fit">
@@ -293,7 +301,7 @@ export default function App() {
               Activate Your 7-Day Free Trial
             </h2>
             <p className="text-slate-400 text-sm max-w-lg mx-auto">
-              Enter your business email in the left sidebar to test live appointment scheduling, lead capture, WhatsApp/Telegram routing, and Gmail confirmations.
+              Enter your business email in the left sidebar to test live order logging in Google Sheets, appointment scheduling, lead capture, and Gmail confirmations.
             </p>
           </div>
         ) : !isTrialActive ? (
@@ -302,7 +310,7 @@ export default function App() {
               Your 7-Day Free Trial Has Ended
             </h2>
             <p className="text-slate-300 text-sm max-w-md mx-auto">
-              Continue automating your client leads, calendar appointments, and multi-channel messages with ₹999/month or ₹20,000 full ownership.
+              Continue automating your orders, client leads, calendar appointments, and multi-channel messages with ₹999/month or ₹20,000 full ownership.
             </p>
             <div className="flex flex-wrap justify-center gap-4 pt-2">
               <a
@@ -327,7 +335,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <section className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 h-fit">
               <h2 className="text-base font-semibold text-white">
-                Channel & Lead Context
+                Channel & Client Context
               </h2>
 
               <div>
@@ -354,7 +362,7 @@ export default function App() {
 
               <div>
                 <label className="block text-xs text-slate-400 mb-1">
-                  Client / Lead Name
+                  Client / Customer Name
                 </label>
                 <input
                   type="text"
@@ -385,6 +393,24 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() =>
+                    triggerQuickPrompt("Place a new order for 2 Enterprise AI Packages and log it in the Orders Google Sheet.")
+                  }
+                  className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
+                >
+                  📦 Place New Order in Orders Sheet
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerQuickPrompt("Check the status of my latest order from the Orders Google Sheet.")
+                  }
+                  className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
+                >
+                  🔍 Track Order Status (Orders Sheet)
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
                     triggerQuickPrompt("Book an appointment for tomorrow at 11:00 AM and send confirmation email.")
                   }
                   className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
@@ -394,16 +420,16 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() =>
-                    triggerQuickPrompt("Register me as a new high-priority lead for AI automation services.")
+                    triggerQuickPrompt("Register me as a new high-priority lead in the Lead CRM Google Sheet.")
                   }
                   className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
                 >
-                  📊 Log New Lead in Google Sheets
+                  📊 Log New Lead in Lead CRM Sheet
                 </button>
                 <button
                   type="button"
                   onClick={() =>
-                    triggerQuickPrompt("Cancel my scheduled meeting and update my lead status.")
+                    triggerQuickPrompt("Cancel my scheduled meeting and update my status.")
                   }
                   className="w-full text-left text-xs p-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 transition"
                 >
@@ -412,7 +438,7 @@ export default function App() {
               </div>
             </section>
 
-            <section className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col h-[560px]">
+            <section className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col h-[610px]">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <h2 className="text-base font-semibold text-white">
                   Live Multi-Level Agent Console ({selectedChannel})
@@ -447,7 +473,7 @@ export default function App() {
 
                 {loading && (
                   <div className="mr-auto bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs text-indigo-400">
-                    ApexDesk AI is checking Calendar, Sheets & drafting response...
+                    ApexDesk AI is updating Orders, Leads, Calendar & Gmail...
                   </div>
                 )}
               </div>
