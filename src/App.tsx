@@ -7,10 +7,7 @@ interface ChatMessage {
   timestamp: string;
   channel: string;
 }
-// Local Docker n8n + ngrok URL (Saved for local testing):
-// const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact";
 
-// 24/7 Live Vercel Serverless Backend (Runs even when laptop/Docker is off):
 const N8N_APEXDESK_WEBHOOK_URL = "/api/agent";
 const RAZORPAY_MONTHLY_LINK = "https://rzp.io/rzp/QDWrlSDb";
 const RAZORPAY_ONETIME_LINK = "https://rzp.io/rzp/lyzkgVe";
@@ -114,12 +111,14 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({
           message: userText,
           chatInput: userText,
           channel: selectedChannel,
+          name: clientName || "Website Lead",
+          phone: clientPhone || "N/A",
+          email: activeEmail,
           client_name: clientName || "Website Lead",
           client_phone: clientPhone || "N/A",
           client_email: activeEmail,
@@ -135,11 +134,11 @@ export default function App() {
       const data = await response.json();
       const record = Array.isArray(data) ? data[0] : data;
       const replyText =
-        record?.output ||
         record?.reply ||
+        record?.output ||
         record?.message ||
         record?.text ||
-        "Request processed. Orders & Leads Google Sheets, Calendar, and Gmail updated.";
+        "Hello! I am ApexDesk AI Agent. How can I assist you today?";
 
       const newAgentMsg: ChatMessage = {
         id: `agent-${Date.now()}`,
@@ -153,7 +152,7 @@ export default function App() {
     } catch (err: unknown) {
       const message =
         err instanceof Error
-          ? `${err.message} — Verify Docker n8n workflow is Active and Webhook CORS is set to *`
+          ? err.message
           : "Failed to reach ApexDesk AI Agent";
       setError(message);
     } finally {

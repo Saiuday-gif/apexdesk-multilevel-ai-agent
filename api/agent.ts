@@ -100,7 +100,7 @@ Otherwise use CHAT.`;
         });
       }
 
-      if (userEmail && BREVO_API_KEY && BREVO_API_KEY !== 'PASTE_YOUR_BREVO_API_KEY_HERE') {
+      if (userEmail && BREVO_API_KEY) {
         await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'api-key': BREVO_API_KEY },
