@@ -8,6 +8,10 @@ interface ChatMessage {
   channel: string;
 }
 
+// Local Docker n8n + ngrok / NGINX URL (Saved in comments for local testing):
+// const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact";
+
+// 24/7 Live Vercel Serverless Backend URL:
 const N8N_APEXDESK_WEBHOOK_URL = "/api/agent";
 const RAZORPAY_MONTHLY_LINK = "https://rzp.io/rzp/QDWrlSDb";
 const RAZORPAY_ONETIME_LINK = "https://rzp.io/rzp/lyzkgVe";
@@ -111,6 +115,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({
           message: userText,

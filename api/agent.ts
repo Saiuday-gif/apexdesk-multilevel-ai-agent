@@ -22,18 +22,18 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const GEMINI_API_KEY = 'AQ.Ab8RN6KSwP4bOtnlKZb_tYs2Wyg2CSnAbs8XYDjaKWET47vaSQ';
+    const GEMINI_API_KEY = (globalThis as any).process?.env?.GEMINI_API_KEY || '';
     const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/4mhh1m1eha2f8';
-    const TELEGRAM_BOT_TOKEN = '9272085514:AAE0mu6Yd47N3dNXSH2n20c-MIJ7Zckhrs';
-    const TELEGRAM_CHAT_ID = '6202497965';
-    const BREVO_API_KEY = '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';
+    const TELEGRAM_BOT_TOKEN = (globalThis as any).process?.env?.TELEGRAM_BOT_TOKEN || '';
+    const TELEGRAM_CHAT_ID = (globalThis as any).process?.env?.TELEGRAM_CHAT_ID || '';
+    const BREVO_API_KEY = (globalThis as any).process?.env?.BREVO_API_KEY || '';
     const SENDER_EMAIL = 'saiuday8161@gmail.com';
 
     const data = await req.json();
     const userMessage = data.message || data.chatInput || data.prompt || '';
-    const userEmail = data.email || '';
-    const userName = data.name || 'Customer';
-    const userPhone = data.phone || '';
+    const userEmail = data.email || data.client_email || '';
+    const userName = data.name || data.client_name || 'Customer';
+    const userPhone = data.phone || data.client_phone || '';
 
     if (!userMessage) {
       return new Response(
