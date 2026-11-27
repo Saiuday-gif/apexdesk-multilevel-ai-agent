@@ -22,11 +22,11 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const GEMINI_API_KEY = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env?.GEMINI_API_KEY || 'AQ.Ab8RN6LtxoAg3mwRZ8C6oxSNQVUZICUG7hgM9mk5RsEq0SZA6Q';
+    const GEMINI_API_KEY = 'AQ.Ab8RN6LtxoAg3mwRZ8C6oxSNQVUZICUG7hgM9mk5RsEq0SZA6Q';
     const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/4mhh1m1eha2f8';
-    const TELEGRAM_BOT_TOKEN = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env?.TELEGRAM_BOT_TOKEN || '9272085514:AAE0mu6Yd47N3dNXSH2n20c-MIJ7Zckhrs';
-    const TELEGRAM_CHAT_ID = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env?.TELEGRAM_CHAT_ID || '6202497965';
-    const BREVO_API_KEY = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process?.env?.BREVO_API_KEY;
+    const TELEGRAM_BOT_TOKEN = '9272085514:AAE0mu6Yd47N3dNXSH2n20c-MIJ7Zckhrs';
+    const TELEGRAM_CHAT_ID = '6202497965';
+    const BREVO_API_KEY = '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';
     const SENDER_EMAIL = 'saiuday8161@gmail.com';
 
     const data = await req.json();
@@ -66,7 +66,16 @@ Otherwise use CHAT.`;
     );
 
     const geminiJson = await geminiRes.json();
-    const aiText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || '{"action":"CHAT","details":"","reply":"Sorry, I could not process that."}';
+
+    if (!geminiRes.ok || !geminiJson.candidates?.[0]?.content?.parts?.[0]?.text) {
+      const apiError = geminiJson.error?.message || JSON.stringify(geminiJson);
+      return new Response(
+        JSON.stringify({ output: 'Gemini API Error: ' + apiError, reply: 'Gemini API Error: ' + apiError }),
+        { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+      );
+    }
+
+    const aiText = geminiJson.candidates[0].content.parts[0].text;
     const aiDecision = JSON.parse(aiText);
 
     let actionSummary = '';
@@ -91,7 +100,7 @@ Otherwise use CHAT.`;
         });
       }
 
-      if (userEmail && BREVO_API_KEY) {
+      if (userEmail && BREVO_API_KEY && BREVO_API_KEY !== 'PASTE_YOUR_BREVO_API_KEY_HERE') {
         await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'api-key': BREVO_API_KEY },
