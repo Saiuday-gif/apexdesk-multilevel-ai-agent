@@ -22,7 +22,7 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const GEMINI_API_KEY = 'AQ.Ab8RN6LtxoAg3mwRZ8C6oxSNQVUZICUG7hgM9mk5RsEq0SZA6Q';
+    const GEMINI_API_KEY = 'AQ.Ab8RN6KSwP4bOtnlKZb_tYs2Wyg2CSnAbs8XYDjaKWET47vaSQ';
     const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/4mhh1m1eha2f8';
     const TELEGRAM_BOT_TOKEN = '9272085514:AAE0mu6Yd47N3dNXSH2n20c-MIJ7Zckhrs';
     const TELEGRAM_CHAT_ID = '6202497965';
