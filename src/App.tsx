@@ -7,8 +7,11 @@ interface ChatMessage {
   timestamp: string;
   channel: string;
 }
+// Local Docker n8n + ngrok URL (Saved for local testing):
+// const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact";
 
-const N8N_APEXDESK_WEBHOOK_URL = "https://ivory-uselessly-bouncy.ngrok-free.dev/webhook/contact"; // Replace with your actual n8n webhook URL
+// 24/7 Live Vercel Serverless Backend (Runs even when laptop/Docker is off):
+const N8N_APEXDESK_WEBHOOK_URL = "/api/agent";
 const RAZORPAY_MONTHLY_LINK = "https://rzp.io/rzp/QDWrlSDb";
 const RAZORPAY_ONETIME_LINK = "https://rzp.io/rzp/lyzkgVe";
 
