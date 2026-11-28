@@ -31,7 +31,7 @@ export default async function handler(req: Request) {
 
     const data = await req.json();
     const userMessage = data.message || data.chatInput || data.prompt || '';
-    const userEmail = data.email || data.client_email || '';
+    const userEmail = data.email || data.client_email || 'saiuday8161@gmail.com';
     const userName = data.name || data.client_name || 'Customer';
     const userPhone = data.phone || data.client_phone || '';
 
